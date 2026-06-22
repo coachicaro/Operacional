@@ -485,7 +485,14 @@ tr:hover td { background: var(--surface-subtle); }
 const SUPABASE_URL = "https://lebhaqjgjhzjkbosmwzu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlYmhhcWpnamh6amtib3Ntd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0OTE5MDYsImV4cCI6MjA5NTA2NzkwNn0.VRI7HDhsiXao4TDQ4X92KF256HjRr05ajFIEcfMD9do";
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let sb;
+try {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  // Se falhar aqui (ex: storage bloqueado pelo navegador), o app.js detecta sb undefined
+  // e mostra mensagem clara na tela em vez de travar silenciosamente.
+  console.error('Falha ao criar cliente Supabase:', e);
+}
 
 
 // ==== propostas.js ====
@@ -1672,6 +1679,24 @@ function openTiposAssistenciaModal() {
 // SYROS OPERACIONAL — Núcleo do app
 // ============================================================
 
+// Captura qualquer erro não tratado e mostra na tela (sem depender de DevTools/console)
+window.addEventListener('error', (e) => {
+  showFatalError('Erro: ' + (e.message || 'falha desconhecida ao carregar o app.'));
+});
+window.addEventListener('unhandledrejection', (e) => {
+  showFatalError('Erro: ' + (e.reason && e.reason.message ? e.reason.message : 'falha desconhecida.'));
+});
+function showFatalError(msg) {
+  let box = document.getElementById('fatal-error-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'fatal-error-box';
+    box.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#C0392B; color:#fff; padding:12px 16px; font-family:sans-serif; font-size:13px; z-index:9999; text-align:center;';
+    document.body.appendChild(box);
+  }
+  box.textContent = msg;
+}
+
 const VIEWS = [
   { key: 'propostas', label: 'Propostas', icon: '01' },
   { key: 'parcelas', label: 'Parcelas', icon: '02' },
@@ -1793,22 +1818,47 @@ function usernameToEmail(username) {
 }
 
 async function attemptLogin() {
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const errEl = document.getElementById('login-error');
-  errEl.style.display = 'none';
-  if (!user || !pass) return;
+  try {
+    const user = document.getElementById('login-user').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    const errEl = document.getElementById('login-error');
+    errEl.style.display = 'none';
+    if (!user || !pass) {
+      errEl.textContent = 'Preencha usuário e senha.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const btn = document.getElementById('login-submit');
+    btn.disabled = true;
+    btn.textContent = 'Entrando...';
 
-  const { data, error } = await sb.auth.signInWithPassword({
-    email: usernameToEmail(user),
-    password: pass,
-  });
-  if (error) {
-    errEl.textContent = 'Usuário ou senha incorretos.';
-    errEl.style.display = 'block';
-    return;
+    if (typeof sb === 'undefined' || !sb || !sb.auth) {
+      errEl.textContent = 'Não foi possível conectar ao servidor. Verifique sua internet e recarregue a página.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+      return;
+    }
+
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: usernameToEmail(user),
+      password: pass,
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+
+    if (error) {
+      errEl.textContent = 'Usuário ou senha incorretos.';
+      errEl.style.display = 'block';
+      return;
+    }
+    showApp(data.user);
+  } catch (err) {
+    showFatalError('Erro ao entrar: ' + err.message);
+    const btn = document.getElementById('login-submit');
+    if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
   }
-  showApp(data.user);
 }
 
 function showApp(user) {
@@ -1834,26 +1884,41 @@ async function handleLogout() {
 
 // ---------- Boot ----------
 window.addEventListener('DOMContentLoaded', async () => {
-  // Se a URL tiver ?sinistro=TOKEN, abre a página pública do cliente — não exige login
-  const params = new URLSearchParams(window.location.search);
-  const trackToken = params.get('sinistro');
-  if (trackToken) {
-    document.getElementById('login-screen').style.display = 'none';
-    renderClientTracking(trackToken);
-    return;
-  }
+  try {
+    // Se a URL tiver ?sinistro=TOKEN, abre a página pública do cliente — não exige login
+    const params = new URLSearchParams(window.location.search);
+    const trackToken = params.get('sinistro');
+    if (trackToken) {
+      document.getElementById('login-screen').style.display = 'none';
+      renderClientTracking(trackToken);
+      return;
+    }
 
-  document.getElementById('login-submit').onclick = attemptLogin;
-  document.getElementById('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
-  document.getElementById('login-user').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
-  document.getElementById('btn-logout').onclick = handleLogout;
+    // Bind dos botões primeiro — garante que cliques funcionem mesmo se a checagem de sessão abaixo falhar
+    document.getElementById('login-submit').onclick = attemptLogin;
+    document.getElementById('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
+    document.getElementById('login-user').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
+    document.getElementById('btn-logout').onclick = handleLogout;
 
-  // Verifica se já existe sessão ativa (evita pedir login de novo a cada refresh)
-  const { data: { session } } = await sb.auth.getSession();
-  if (session && session.user) {
-    showApp(session.user);
-  } else {
-    showLogin();
+    if (typeof supabase === 'undefined') {
+      showFatalError('Não foi possível carregar a biblioteca de conexão. Verifique sua internet e recarregue a página.');
+      return;
+    }
+
+    // Verifica se já existe sessão ativa (evita pedir login de novo a cada refresh)
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session && session.user) {
+        showApp(session.user);
+      } else {
+        showLogin();
+      }
+    } catch (sessionErr) {
+      // Falha ao checar sessão não deve impedir o login manual de funcionar
+      showLogin();
+    }
+  } catch (err) {
+    showFatalError('Erro ao iniciar o app: ' + err.message);
   }
 });
 

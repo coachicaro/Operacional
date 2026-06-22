@@ -5,7 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Syros Operacional</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js"></script>
+<script>
+(function loadSupabaseLib() {
+  const sources = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
+    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js',
+  ];
+  let i = 0;
+  function tryNext() {
+    if (i >= sources.length) {
+      window.SUPABASE_LIB_FAILED = true;
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = sources[i];
+    s.onerror = function () { i++; tryNext(); };
+    document.head.appendChild(s);
+  }
+  tryNext();
+})();
+</script>
 <style>
 :root {
   --bg: #F2F3F7;
@@ -485,14 +505,9 @@ tr:hover td { background: var(--surface-subtle); }
 const SUPABASE_URL = "https://lebhaqjgjhzjkbosmwzu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlYmhhcWpnamh6amtib3Ntd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0OTE5MDYsImV4cCI6MjA5NTA2NzkwNn0.VRI7HDhsiXao4TDQ4X92KF256HjRr05ajFIEcfMD9do";
 
+// O client 'sb' é criado em app.js, no boot, depois de garantir que a biblioteca
+// supabase carregou (com fallback de múltiplos CDNs). Declarado aqui para ficar acessível globalmente.
 let sb;
-try {
-  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (e) {
-  // Se falhar aqui (ex: storage bloqueado pelo navegador), o app.js detecta sb undefined
-  // e mostra mensagem clara na tela em vez de travar silenciosamente.
-  console.error('Falha ao criar cliente Supabase:', e);
-}
 
 
 // ==== propostas.js ====
@@ -1882,17 +1897,30 @@ async function handleLogout() {
   document.getElementById('login-pass').value = '';
 }
 
+// Espera a biblioteca supabase (carregada dinamicamente, com fallback de CDN) ficar disponível
+function waitForSupabaseLib(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function check() {
+      if (typeof supabase !== 'undefined' && supabase.createClient) {
+        resolve();
+      } else if (window.SUPABASE_LIB_FAILED) {
+        reject(new Error('todas as fontes de conexão falharam'));
+      } else if (Date.now() - start > timeoutMs) {
+        reject(new Error('tempo esgotado ao carregar a biblioteca de conexão'));
+      } else {
+        setTimeout(check, 100);
+      }
+    })();
+  });
+}
+
 // ---------- Boot ----------
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     // Se a URL tiver ?sinistro=TOKEN, abre a página pública do cliente — não exige login
     const params = new URLSearchParams(window.location.search);
     const trackToken = params.get('sinistro');
-    if (trackToken) {
-      document.getElementById('login-screen').style.display = 'none';
-      renderClientTracking(trackToken);
-      return;
-    }
 
     // Bind dos botões primeiro — garante que cliques funcionem mesmo se a checagem de sessão abaixo falhar
     document.getElementById('login-submit').onclick = attemptLogin;
@@ -1900,8 +1928,36 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('login-user').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
     document.getElementById('btn-logout').onclick = handleLogout;
 
-    if (typeof supabase === 'undefined') {
-      showFatalError('Não foi possível carregar a biblioteca de conexão. Verifique sua internet e recarregue a página.');
+    // Mostra que está carregando a conexão, em vez de deixar a tela parada sem feedback
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = 'Conectando...';
+    errEl.style.display = 'block';
+    errEl.style.background = '#E8EAF3';
+    errEl.style.color = '#1A2050';
+
+    try {
+      await waitForSupabaseLib();
+    } catch (libErr) {
+      showFatalError('Não foi possível carregar a biblioteca de conexão (' + libErr.message + '). Verifique sua internet, troque de rede (Wi-Fi/dados) e recarregue a página.');
+      errEl.textContent = 'Falha ao conectar. Recarregue a página ou troque de rede.';
+      errEl.style.background = '';
+      errEl.style.color = '';
+      return;
+    }
+
+    // Cria o client agora que a lib está garantidamente disponível
+    try {
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+      showFatalError('Erro ao iniciar conexão: ' + e.message);
+      return;
+    }
+
+    errEl.style.display = 'none';
+
+    if (trackToken) {
+      document.getElementById('login-screen').style.display = 'none';
+      renderClientTracking(trackToken);
       return;
     }
 
@@ -1914,7 +1970,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         showLogin();
       }
     } catch (sessionErr) {
-      // Falha ao checar sessão não deve impedir o login manual de funcionar
       showLogin();
     }
   } catch (err) {

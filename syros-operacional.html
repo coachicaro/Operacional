@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Syros Operacional</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js"></script>
+<style>
+:root {
+  --bg: #F2F3F7;
+  --surface: #FFFFFF;
+  --surface-subtle: #F5F6FA;
+  --border: #DDE0EC;
+  --border-strong: #B8BDCF;
+  --text: #1A1917;
+  --text-2: #5C5850;
+  --text-3: #9C9890;
+  --accent: #2A3568;
+  --accent-dark: #1f2854;
+  --accent-light: #E8EAF3;
+  --accent-text: #1A2050;
+  --gold: #E8A020;
+  --green: #2DB863;
+  --green-dark: #1A6B3A;
+  --green-light: #E8F5ED;
+  --danger: #C0392B;
+  --danger-light: #FDECEA;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+.layout { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  background: var(--accent);
+  color: #fff;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+}
+.sidebar-brand {
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar-brand .name {
+  font-family: 'DM Serif Display', serif;
+  font-size: 20px;
+}
+.sidebar-brand .sub {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+}
+.nav { padding: 12px 0; flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 24px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  color: rgba(255,255,255,0.75);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.15s;
+  user-select: none;
+}
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.nav-item.active {
+  background: rgba(255,255,255,0.10);
+  border-left-color: var(--gold);
+  color: #fff;
+}
+.nav-item .icon { width: 18px; text-align: center; opacity: 0.9; }
+.sidebar-footer {
+  padding: 16px 24px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Main */
+.main { margin-left: 240px; flex: 1; min-width: 0; }
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0;
+}
+.topbar .meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.content { padding: 28px 32px 60px; }
+
+/* Buttons */
+.btn {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:hover { background: var(--surface-subtle); border-color: var(--border-strong); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-green:hover { background: var(--green-dark); }
+.btn-danger { color: var(--danger); border-color: #F5C0BB; background: var(--danger-light); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card-pad { padding: 20px 24px; }
+
+/* Inputs */
+input, select, textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  color: var(--text);
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(42,53,104,0.08);
+  background: #fff;
+}
+label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  display: block;
+  margin-bottom: 5px;
+}
+.field { margin-bottom: 14px; }
+
+/* Badges/chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--accent-light);
+  color: var(--accent-text);
+  border: 1px solid rgba(42,53,104,0.15);
+  white-space: nowrap;
+}
+.chip-green { background: var(--green-light); color: var(--green-dark); border-color: rgba(45,184,99,0.25); }
+.chip-danger { background: var(--danger-light); color: var(--danger); border-color: rgba(192,57,43,0.25); }
+.chip-gold { background: var(--gold); color: #fff; }
+
+/* Tabs content visibility */
+.view { display: none; }
+.view.active { display: block; }
+
+/* Loading / empty */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-3);
+}
+.empty-state .big { font-size: 32px; margin-bottom: 8px; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: var(--accent);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  z-index: 999;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.25s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.danger { background: var(--danger); }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(26,25,23,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 19px;
+  font-weight: 400;
+  margin: 0;
+}
+.modal-close { cursor: pointer; color: var(--text-3); font-size: 20px; line-height: 1; background: none; border: none; }
+.modal-body { padding: 20px 24px; }
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Kanban */
+.kanban {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 260px;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+.kanban-col {
+  background: var(--surface-subtle);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+}
+.kanban-col-header {
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  background: var(--surface-subtle);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.kanban-col-count {
+  background: rgba(42,53,104,0.1);
+  color: var(--accent);
+  border-radius: 99px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+.kanban-col-body {
+  padding: 10px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kanban-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: var(--shadow);
+}
+.kanban-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.kanban-card.urgent { border-color: var(--danger); background: var(--danger-light); }
+.kanban-card .title { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
+.kanban-card .sub { font-size: 11.5px; color: var(--text-2); margin-bottom: 6px; }
+.kanban-card .row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.kanban-card .days-stuck { font-size: 11px; font-weight: 600; }
+.days-ok { color: var(--text-3); }
+.days-warn { color: var(--gold); }
+.days-danger { color: var(--danger); }
+
+/* Tabs (sub-navigation inside a view) */
+.subtabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.subtab {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.subtab:hover { color: var(--text); }
+.subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); border-bottom: 1px solid var(--border); font-weight: 600; }
+td { padding: 12px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface-subtle); }
+
+/* Stat cards */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.stat-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+.stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); margin-bottom: 6px; }
+.stat-card .value { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--accent); }
+.stat-card .value.small { font-size: 20px; }
+
+.row-flex { display: flex; gap: 10px; align-items: center; }
+.flex-1 { flex: 1; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.text-muted { color: var(--text-3); }
+.mb-0 { margin-bottom: 0; }
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 17px;
+  margin: 28px 0 14px;
+}
+.section-title:first-child { margin-top: 0; }
+
+@media (max-width: 860px) {
+  .sidebar { width: 100%; position: relative; flex-direction: row; overflow-x: auto; }
+  .main { margin-left: 0; }
+  .sidebar-brand, .sidebar-footer { display: none; }
+  .nav { display: flex; padding: 0; }
+  .nav-item { border-left: none; border-bottom: 3px solid transparent; padding: 14px 16px; white-space: nowrap; }
+  .nav-item.active { border-left-color: transparent; border-bottom-color: var(--gold); }
+  .content { padding: 18px 16px 40px; }
+  .topbar { padding: 14px 16px; }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Login screen */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  background: linear-gradient(135deg, #2A3568 0%, #1f2854 100%);
+  padding: 20px;
+}
+.login-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 360px;
+}
+.login-brand { text-align: center; margin-bottom: 26px; }
+.login-brand .name { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--accent); }
+.login-brand .sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-top: 4px; }
+.login-error {
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 12.5px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="name">Syros</div>
+      <div class="sub">Painel Operacional</div>
+    </div>
+    <div class="field">
+      <label>Usuário</label>
+      <input id="login-user" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div id="login-error" class="login-error" style="display:none;"></div>
+    <button class="btn btn-primary" id="login-submit" style="width:100%; justify-content:center; padding:11px;">Entrar</button>
+  </div>
+</div>
+
+<div class="layout" id="app-layout" style="display:none;">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="name">Syros</div>
+      <div class="sub">Painel Operacional</div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-footer" id="sidebar-footer">Syros Financial</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="page-title">Propostas</h1>
+        <div class="meta" id="page-meta"></div>
+      </div>
+      <div class="row-flex">
+        <div id="page-actions"></div>
+        <button class="btn btn-sm" id="btn-logout" title="Sair">Sair</button>
+      </div>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+// ==== config.js ====
+// Configuração de conexão com o Supabase
+// Projeto: ERP Syrus (tabelas isoladas com prefixo corretora_)
+const SUPABASE_URL = "https://lebhaqjgjhzjkbosmwzu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlYmhhcWpnamh6amtib3Ntd3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0OTE5MDYsImV4cCI6MjA5NTA2NzkwNn0.VRI7HDhsiXao4TDQ4X92KF256HjRr05ajFIEcfMD9do";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+
+// ==== propostas.js ====
+// ============================================================
+// PROPOSTAS
+// ============================================================
+
+const PROPOSTA_STATUS = [
+  { key: 'recebido', label: 'PDF recebido' },
+  { key: 'importado_segfy', label: 'Importado no SEGFY' },
+  { key: 'comissao_lancada', label: 'Comissão lançada' },
+  { key: 'pendente_seguradora', label: 'Pendente seguradora' },
+  { key: 'apolice_ok', label: 'Apólice/boleto OK' },
+  { key: 'enviado_cliente', label: 'Enviado ao cliente' },
+  { key: 'concluido', label: 'Concluído' },
+];
+
+async function renderPropostas() {
+  document.getElementById('page-meta').textContent = 'Funil de propostas — Discord → SEGFY → seguradora → cliente';
+  document.getElementById('page-actions').innerHTML = `
+    <div class="row-flex">
+      <button class="btn" id="btn-import-propostas">Importar lista do SEGFY</button>
+      <button class="btn btn-primary" id="btn-nova-proposta">+ Nova proposta</button>
+    </div>`;
+  document.getElementById('btn-import-propostas').onclick = openImportPropostasModal;
+  document.getElementById('btn-nova-proposta').onclick = () => openPropostaModal(null);
+
+  const data = await sbCall(
+    sb.from('corretora_propostas').select('*').order('created_at', { ascending: false }),
+    'Não foi possível carregar as propostas.'
+  );
+  renderPropostasKanban(data || []);
+}
+
+function renderPropostasKanban(propostas) {
+  const content = document.getElementById('content');
+  if (propostas.length === 0) {
+    content.innerHTML = `<div class="empty-state"><div class="big">📋</div>Nenhuma proposta ainda. Importe a lista do SEGFY ou cadastre uma nova.</div>`;
+    return;
+  }
+  const byStatus = {};
+  PROPOSTA_STATUS.forEach(s => byStatus[s.key] = []);
+  propostas.forEach(p => { (byStatus[p.status] || byStatus['recebido']).push(p); });
+
+  content.innerHTML = `<div class="kanban">${PROPOSTA_STATUS.map(s => {
+    const items = byStatus[s.key];
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header">
+          <span>${s.label}</span>
+          <span class="kanban-col-count">${items.length}</span>
+        </div>
+        <div class="kanban-col-body">
+          ${items.map(p => renderPropostaCard(p)).join('') || '<div class="text-muted" style="font-size:12px;padding:8px;">Vazio</div>'}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  content.querySelectorAll('.kanban-card').forEach(el => {
+    el.addEventListener('click', () => {
+      const p = propostas.find(x => x.id === el.dataset.id);
+      openPropostaModal(p);
+    });
+  });
+}
+
+function renderPropostaCard(p) {
+  let stuckHtml = '';
+  let urgentClass = '';
+  if (p.status === 'pendente_seguradora' && p.data_pendencia) {
+    const days = daysSince(p.data_pendencia);
+    let cls = 'days-ok';
+    if (days >= 10) { cls = 'days-danger'; urgentClass = 'urgent'; }
+    else if (days >= 5) cls = 'days-warn';
+    stuckHtml = `<span class="days-stuck ${cls}">${days}d parado</span>`;
+  }
+  return `
+    <div class="kanban-card ${urgentClass}" data-id="${p.id}">
+      <div class="title">${escapeHtml(p.cliente_nome)}</div>
+      <div class="sub">${escapeHtml(p.seguradora || 'Seguradora não informada')} ${p.numero_proposta ? '· ' + escapeHtml(p.numero_proposta) : ''}</div>
+      <div class="row">
+        ${p.responsavel ? `<span class="chip">${escapeHtml(p.responsavel)}</span>` : '<span></span>'}
+        ${stuckHtml}
+      </div>
+    </div>`;
+}
+
+function openPropostaModal(p) {
+  const isNew = !p;
+  p = p || { status: 'recebido' };
+  const statusOptions = PROPOSTA_STATUS.map(s => `<option value="${s.key}" ${p.status === s.key ? 'selected' : ''}>${s.label}</option>`).join('');
+
+  const body = `
+    <div class="field"><label>Cliente</label><input id="f-cliente" value="${escapeHtml(p.cliente_nome || '')}" placeholder="Nome do cliente"></div>
+    <div class="grid-2">
+      <div class="field"><label>Seguradora</label><input id="f-seguradora" value="${escapeHtml(p.seguradora || '')}"></div>
+      <div class="field"><label>Nº da proposta</label><input id="f-numero" value="${escapeHtml(p.numero_proposta || '')}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Ramo</label><input id="f-ramo" value="${escapeHtml(p.ramo || '')}" placeholder="Auto, vida, residencial..."></div>
+      <div class="field"><label>Comissão (R$)</label><input id="f-comissao" type="number" step="0.01" value="${p.comissao_valor ?? ''}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Status</label><select id="f-status">${statusOptions}</select></div>
+      <div class="field"><label>Responsável</label><input id="f-responsavel" value="${escapeHtml(p.responsavel || '')}"></div>
+    </div>
+    <div class="field"><label>Pendente desde (se aplicável)</label><input id="f-pendencia" type="date" value="${p.data_pendencia || ''}"></div>
+    <div class="field"><label>Observações</label><textarea id="f-obs" rows="3">${escapeHtml(p.observacoes || '')}</textarea></div>
+  `;
+  const footer = `
+    ${!isNew ? '<button class="btn btn-danger" id="btn-del-proposta">Excluir</button>' : ''}
+    <div class="flex-1"></div>
+    <button class="btn" id="btn-cancel-proposta">Cancelar</button>
+    <button class="btn btn-primary" id="btn-save-proposta">${isNew ? 'Criar' : 'Salvar'}</button>
+  `;
+  openModal(isNew ? 'Nova proposta' : 'Editar proposta', body, footer);
+
+  document.getElementById('btn-cancel-proposta').onclick = closeModal;
+  if (!isNew) document.getElementById('btn-del-proposta').onclick = async () => {
+    if (!confirm('Excluir esta proposta?')) return;
+    await sbCall(sb.from('corretora_propostas').delete().eq('id', p.id), 'Erro ao excluir.');
+    closeModal();
+    showToast('Proposta excluída.');
+    renderPropostas();
+  };
+  document.getElementById('btn-save-proposta').onclick = async () => {
+    const payload = {
+      cliente_nome: document.getElementById('f-cliente').value.trim(),
+      seguradora: document.getElementById('f-seguradora').value.trim() || null,
+      numero_proposta: document.getElementById('f-numero').value.trim() || null,
+      ramo: document.getElementById('f-ramo').value.trim() || null,
+      comissao_valor: document.getElementById('f-comissao').value || null,
+      status: document.getElementById('f-status').value,
+      responsavel: document.getElementById('f-responsavel').value.trim() || null,
+      data_pendencia: document.getElementById('f-pendencia').value || null,
+      observacoes: document.getElementById('f-obs').value.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!payload.cliente_nome) { showToast('Informe o nome do cliente.', true); return; }
+
+    if (isNew) {
+      await sbCall(sb.from('corretora_propostas').insert(payload), 'Erro ao criar proposta.');
+      showToast('Proposta criada.');
+    } else {
+      await sbCall(sb.from('corretora_propostas').update(payload).eq('id', p.id), 'Erro ao salvar.');
+      showToast('Proposta atualizada.');
+    }
+    closeModal();
+    renderPropostas();
+  };
+}
+
+function openImportPropostasModal() {
+  const body = `
+    <p class="text-muted" style="margin-top:0;">Cole abaixo a lista de propostas pendentes (uma por linha). Formato sugerido, separado por <strong>ponto e vírgula</strong>:</p>
+    <p class="text-muted" style="font-size:12px;">cliente; seguradora; nº proposta; status (opcional)</p>
+    <div class="field">
+      <textarea id="import-text" rows="10" placeholder="João Silva; Porto Seguro; 12345; pendente_seguradora
+Maria Souza; Allianz; 98765"></textarea>
+    </div>
+  `;
+  const footer = `
+    <button class="btn" id="btn-cancel-import">Cancelar</button>
+    <button class="btn btn-primary" id="btn-do-import">Importar</button>
+  `;
+  openModal('Importar propostas do SEGFY', body, footer);
+  document.getElementById('btn-cancel-import').onclick = closeModal;
+  document.getElementById('btn-do-import').onclick = async () => {
+    const raw = document.getElementById('import-text').value.trim();
+    if (!raw) { closeModal(); return; }
+    const validStatusKeys = PROPOSTA_STATUS.map(s => s.key);
+    const rows = raw.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+      const parts = line.split(';').map(p => p.trim());
+      const status = parts[3] && validStatusKeys.includes(parts[3]) ? parts[3] : 'pendente_seguradora';
+      return {
+        cliente_nome: parts[0] || 'Sem nome',
+        seguradora: parts[1] || null,
+        numero_proposta: parts[2] || null,
+        status,
+        data_pendencia: status === 'pendente_seguradora' ? new Date().toISOString().slice(0,10) : null,
+      };
+    });
+    await sbCall(sb.from('corretora_propostas').insert(rows), 'Erro ao importar.');
+    showToast(`${rows.length} proposta(s) importada(s).`);
+    closeModal();
+    renderPropostas();
+  };
+}
+
+
+// ==== parcelas.js ====
+// ============================================================
+// PARCELAS
+// ============================================================
+
+const PARCELA_STATUS = [
+  { key: 'atraso_identificado', label: 'Atraso identificado' },
+  { key: 'boleto_baixado', label: 'Boleto baixado' },
+  { key: 'enviado_whatsapp', label: 'Enviado (WhatsApp)' },
+  { key: 'risco_cancelamento', label: 'Risco de cancelamento' },
+  { key: 'cliente_avisado', label: 'Cliente avisado' },
+];
+
+async function renderParcelas() {
+  document.getElementById('page-meta').textContent = 'Controle de parcelas em atraso, até o envio do boleto';
+  document.getElementById('page-actions').innerHTML = `
+    <div class="row-flex">
+      <button class="btn" id="btn-import-parcelas">Importar lista</button>
+      <button class="btn btn-primary" id="btn-nova-parcela">+ Nova parcela</button>
+    </div>`;
+  document.getElementById('btn-import-parcelas').onclick = openImportParcelasModal;
+  document.getElementById('btn-nova-parcela').onclick = () => openParcelaModal(null);
+
+  const data = await sbCall(
+    sb.from('corretora_parcelas').select('*').order('created_at', { ascending: false }),
+    'Não foi possível carregar as parcelas.'
+  );
+  renderParcelasKanban(data || []);
+}
+
+function renderParcelasKanban(parcelas) {
+  const content = document.getElementById('content');
+  if (parcelas.length === 0) {
+    content.innerHTML = `<div class="empty-state"><div class="big">💳</div>Nenhuma parcela em atraso registrada.</div>`;
+    return;
+  }
+  const byStatus = {};
+  PARCELA_STATUS.forEach(s => byStatus[s.key] = []);
+  parcelas.forEach(p => { (byStatus[p.status] || byStatus['atraso_identificado']).push(p); });
+
+  content.innerHTML = `<div class="kanban">${PARCELA_STATUS.map(s => {
+    const items = byStatus[s.key];
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header">
+          <span>${s.label}</span>
+          <span class="kanban-col-count">${items.length}</span>
+        </div>
+        <div class="kanban-col-body">
+          ${items.map(p => renderParcelaCard(p)).join('') || '<div class="text-muted" style="font-size:12px;padding:8px;">Vazio</div>'}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  content.querySelectorAll('.kanban-card').forEach(el => {
+    el.addEventListener('click', () => {
+      const p = parcelas.find(x => x.id === el.dataset.id);
+      openParcelaModal(p);
+    });
+  });
+}
+
+function renderParcelaCard(p) {
+  const urgentClass = p.status === 'risco_cancelamento' ? 'urgent' : '';
+  let vencInfo = '';
+  if (p.data_vencimento) {
+    const days = daysSince(p.data_vencimento);
+    if (days > 0) vencInfo = `<span class="days-stuck ${days >= 15 ? 'days-danger' : 'days-warn'}">${days}d em atraso</span>`;
+  }
+  return `
+    <div class="kanban-card ${urgentClass}" data-id="${p.id}">
+      <div class="title">${escapeHtml(p.cliente_nome)}</div>
+      <div class="sub">${escapeHtml(p.seguradora || '—')} ${p.numero_parcela ? '· parc. ' + escapeHtml(p.numero_parcela) : ''}</div>
+      <div class="row">
+        <span class="chip">${fmtMoney(p.valor)}</span>
+        ${vencInfo}
+      </div>
+    </div>`;
+}
+
+function openParcelaModal(p) {
+  const isNew = !p;
+  p = p || { status: 'atraso_identificado' };
+  const statusOptions = PARCELA_STATUS.map(s => `<option value="${s.key}" ${p.status === s.key ? 'selected' : ''}>${s.label}</option>`).join('');
+
+  const body = `
+    <div class="field"><label>Cliente</label><input id="f-cliente" value="${escapeHtml(p.cliente_nome || '')}"></div>
+    <div class="grid-2">
+      <div class="field"><label>Seguradora</label><input id="f-seguradora" value="${escapeHtml(p.seguradora || '')}"></div>
+      <div class="field"><label>Nº da parcela</label><input id="f-numero" value="${escapeHtml(p.numero_parcela || '')}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Valor (R$)</label><input id="f-valor" type="number" step="0.01" value="${p.valor ?? ''}"></div>
+      <div class="field"><label>Vencimento</label><input id="f-vencimento" type="date" value="${p.data_vencimento || ''}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Status</label><select id="f-status">${statusOptions}</select></div>
+      <div class="field"><label>Responsável</label><input id="f-responsavel" value="${escapeHtml(p.responsavel || '')}"></div>
+    </div>
+    <div class="field"><label>Observações</label><textarea id="f-obs" rows="3">${escapeHtml(p.observacoes || '')}</textarea></div>
+  `;
+  const footer = `
+    ${!isNew ? '<button class="btn btn-danger" id="btn-del-parcela">Excluir</button>' : ''}
+    <div class="flex-1"></div>
+    <button class="btn" id="btn-cancel-parcela">Cancelar</button>
+    <button class="btn btn-primary" id="btn-save-parcela">${isNew ? 'Criar' : 'Salvar'}</button>
+  `;
+  openModal(isNew ? 'Nova parcela em atraso' : 'Editar parcela', body, footer);
+
+  document.getElementById('btn-cancel-parcela').onclick = closeModal;
+  if (!isNew) document.getElementById('btn-del-parcela').onclick = async () => {
+    if (!confirm('Excluir este registro?')) return;
+    await sbCall(sb.from('corretora_parcelas').delete().eq('id', p.id), 'Erro ao excluir.');
+    closeModal();
+    showToast('Registro excluído.');
+    renderParcelas();
+  };
+  document.getElementById('btn-save-parcela').onclick = async () => {
+    const payload = {
+      cliente_nome: document.getElementById('f-cliente').value.trim(),
+      seguradora: document.getElementById('f-seguradora').value.trim() || null,
+      numero_parcela: document.getElementById('f-numero').value.trim() || null,
+      valor: document.getElementById('f-valor').value || null,
+      data_vencimento: document.getElementById('f-vencimento').value || null,
+      status: document.getElementById('f-status').value,
+      responsavel: document.getElementById('f-responsavel').value.trim() || null,
+      observacoes: document.getElementById('f-obs').value.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (!payload.cliente_nome) { showToast('Informe o nome do cliente.', true); return; }
+
+    if (isNew) {
+      await sbCall(sb.from('corretora_parcelas').insert(payload), 'Erro ao criar.');
+      showToast('Parcela registrada.');
+    } else {
+      await sbCall(sb.from('corretora_parcelas').update(payload).eq('id', p.id), 'Erro ao salvar.');
+      showToast('Parcela atualizada.');
+    }
+    closeModal();
+    renderParcelas();
+  };
+}
+
+function openImportParcelasModal() {
+  const body = `
+    <p class="text-muted" style="margin-top:0;">Cole a lista de parcelas em atraso (uma por linha), separada por <strong>ponto e vírgula</strong>:</p>
+    <p class="text-muted" style="font-size:12px;">cliente; seguradora; nº parcela; valor; vencimento (AAAA-MM-DD)</p>
+    <div class="field">
+      <textarea id="import-text" rows="10" placeholder="João Silva; Porto Seguro; 3; 250.00; 2026-06-10
+Maria Souza; Allianz; 5; 180.50; 2026-06-05"></textarea>
+    </div>
+  `;
+  const footer = `
+    <button class="btn" id="btn-cancel-import">Cancelar</button>
+    <button class="btn btn-primary" id="btn-do-import">Importar</button>
+  `;
+  openModal('Importar parcelas', body, footer);
+  document.getElementById('btn-cancel-import').onclick = closeModal;
+  document.getElementById('btn-do-import').onclick = async () => {
+    const raw = document.getElementById('import-text').value.trim();
+    if (!raw) { closeModal(); return; }
+    const rows = raw.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+      const parts = line.split(';').map(p => p.trim());
+      return {
+        cliente_nome: parts[0] || 'Sem nome',
+        seguradora: parts[1] || null,
+        numero_parcela: parts[2] || null,
+        valor: parts[3] ? parseFloat(parts[3].replace(',', '.')) : null,
+        data_vencimento: parts[4] || null,
+        status: 'atraso_identificado',
+      };
+    });
+    await sbCall(sb.from('corretora_parcelas').insert(rows), 'Erro ao importar.');
+    showToast(`${rows.length} parcela(s) importada(s).`);
+    closeModal();
+    renderParcelas();
+  };
+}
+
+
+// ==== sinistros.js ====
+// ============================================================
+// SINISTROS
+// ============================================================
+
+let sinistroTipos = [];
+let sinistrosSubview = 'kanban';
+
+async function renderSinistros() {
+  document.getElementById('page-meta').textContent = 'Abertura, acompanhamento e indicadores de sinistros';
+  document.getElementById('page-actions').innerHTML = `
+    <div class="row-flex">
+      <button class="btn" id="btn-tipos-sinistro">Tipos de sinistro</button>
+      <button class="btn btn-primary" id="btn-novo-sinistro">+ Novo sinistro</button>
+    </div>`;
+  document.getElementById('btn-novo-sinistro').onclick = () => openNovoSinistroModal();
+  document.getElementById('btn-tipos-sinistro').onclick = () => openTiposSinistroModal();
+
+  sinistroTipos = await sbCall(sb.from('corretora_sinistro_tipos').select('*').eq('ativo', true), 'Erro ao carregar tipos.') || [];
+
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="subtabs">
+      <div class="subtab ${sinistrosSubview === 'kanban' ? 'active' : ''}" data-sub="kanban">Acompanhamento</div>
+      <div class="subtab ${sinistrosSubview === 'dashboard' ? 'active' : ''}" data-sub="dashboard">Dashboard</div>
+    </div>
+    <div id="sinistros-subcontent"></div>
+  `;
+  content.querySelectorAll('.subtab').forEach(el => {
+    el.addEventListener('click', () => { sinistrosSubview = el.dataset.sub; renderSinistros(); });
+  });
+
+  if (sinistrosSubview === 'kanban') loadSinistrosKanban();
+  else loadSinistrosDashboard();
+}
+
+const SINISTRO_ETAPAS_PADRAO = [
+  { chave: 'acionamento', label: 'Acionamento' },
+  { chave: 'documentos', label: 'Documentos' },
+  { chave: 'abertura_seguradora', label: 'Aberto na seguradora' },
+  { chave: 'acompanhamento', label: 'Acompanhamento' },
+  { chave: 'encerramento', label: 'Encerrado' },
+];
+
+async function loadSinistrosKanban() {
+  const data = await sbCall(
+    sb.from('corretora_sinistros').select('*').neq('status_geral', 'cancelado').order('created_at', { ascending: false }),
+    'Erro ao carregar sinistros.'
+  ) || [];
+  const sub = document.getElementById('sinistros-subcontent');
+  if (data.length === 0) {
+    sub.innerHTML = `<div class="empty-state"><div class="big">🗂️</div>Nenhum sinistro em aberto. Clique em "+ Novo sinistro" para começar.</div>`;
+    return;
+  }
+
+  // Reúne o conjunto de etapas-chave em uso (etapas dos tipos), preservando ordem padrão + extras
+  const allKeys = [];
+  sinistroTipos.forEach(t => (t.etapas || []).forEach(e => { if (!allKeys.find(k => k.chave === e.chave)) allKeys.push(e); }));
+  const etapas = allKeys.length ? allKeys : SINISTRO_ETAPAS_PADRAO;
+
+  const byEtapa = {};
+  etapas.forEach(e => byEtapa[e.chave] = []);
+  byEtapa['concluido'] = [];
+  byEtapa['_outros'] = []; // fallback para etapa_atual que não bate com nenhuma coluna conhecida
+  data.forEach(s => {
+    if (s.status_geral === 'concluido') byEtapa['concluido'].push(s);
+    else if (byEtapa[s.etapa_atual]) byEtapa[s.etapa_atual].push(s);
+    else byEtapa['_outros'].push(s);
+  });
+  if (byEtapa['_outros'].length) {
+    etapas.push({ chave: '_outros', label: 'Outras etapas' });
+  }
+
+  const cols = [...etapas.map(e => ({ key: e.chave, label: e.label })), { key: 'concluido', label: 'Concluído' }];
+
+  sub.innerHTML = `<div class="kanban">${cols.map(c => {
+    const items = byEtapa[c.key] || [];
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header"><span>${c.label}</span><span class="kanban-col-count">${items.length}</span></div>
+        <div class="kanban-col-body">
+          ${items.map(s => renderSinistroCard(s)).join('') || '<div class="text-muted" style="font-size:12px;padding:8px;">Vazio</div>'}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  sub.querySelectorAll('.kanban-card').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = data.find(x => x.id === el.dataset.id);
+      openSinistroModal(s);
+    });
+  });
+}
+
+function renderSinistroCard(s) {
+  let urgentClass = '';
+  let prazoInfo = '';
+  if (s.proximo_prazo) {
+    const days = daysUntil(s.proximo_prazo);
+    if (days !== null) {
+      if (days < 0) { urgentClass = 'urgent'; prazoInfo = `<span class="days-stuck days-danger">${Math.abs(days)}d atrasado</span>`; }
+      else if (days <= 2) prazoInfo = `<span class="days-stuck days-warn">vence em ${days}d</span>`;
+      else prazoInfo = `<span class="days-stuck days-ok">vence em ${days}d</span>`;
+    }
+  }
+  return `
+    <div class="kanban-card ${urgentClass}" data-id="${s.id}">
+      <div class="title">${escapeHtml(s.cliente_nome)}</div>
+      <div class="sub">${escapeHtml(s.tipo_nome)} · ${escapeHtml(s.codigo)}</div>
+      <div class="row">
+        <span class="chip">${s.apolice_numero ? escapeHtml(s.apolice_numero) : 'sem apólice'}</span>
+        ${prazoInfo}
+      </div>
+    </div>`;
+}
+
+async function openNovoSinistroModal() {
+  if (sinistroTipos.length === 0) {
+    showToast('Cadastre um tipo de sinistro primeiro.', true);
+    openTiposSinistroModal();
+    return;
+  }
+  const tipoOptions = sinistroTipos.map(t => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
+  const body = `
+    <div class="field"><label>Cliente</label><input id="f-cliente" placeholder="Nome do cliente"></div>
+    <div class="grid-2">
+      <div class="field"><label>Telefone</label><input id="f-telefone" placeholder="WhatsApp"></div>
+      <div class="field"><label>Nº da apólice</label><input id="f-apolice"></div>
+    </div>
+    <div class="field"><label>Tipo de sinistro</label><select id="f-tipo">${tipoOptions}</select></div>
+    <div class="field"><label>Descrição</label><textarea id="f-descricao" rows="2" placeholder="O que aconteceu"></textarea></div>
+    <div class="field"><label>Responsável</label><input id="f-responsavel"></div>
+  `;
+  const footer = `
+    <button class="btn" id="btn-cancel">Cancelar</button>
+    <button class="btn btn-primary" id="btn-create">Criar sinistro</button>
+  `;
+  openModal('Novo sinistro', body, footer);
+  document.getElementById('btn-cancel').onclick = closeModal;
+  document.getElementById('btn-create').onclick = async () => {
+    const cliente = document.getElementById('f-cliente').value.trim();
+    if (!cliente) { showToast('Informe o cliente.', true); return; }
+    const tipo = sinistroTipos.find(t => t.id === document.getElementById('f-tipo').value);
+    const etapas = tipo.etapas && tipo.etapas.length ? tipo.etapas : SINISTRO_ETAPAS_PADRAO.map(e => ({...e, prazo_dias: 5, automatica: false}));
+    const primeiraEtapa = etapas[0];
+
+    const payload = {
+      cliente_nome: cliente,
+      cliente_telefone: document.getElementById('f-telefone').value.trim() || null,
+      apolice_numero: document.getElementById('f-apolice').value.trim() || null,
+      tipo_id: tipo.id,
+      tipo_nome: tipo.nome,
+      descricao: document.getElementById('f-descricao').value.trim() || null,
+      responsavel: document.getElementById('f-responsavel').value.trim() || null,
+      data_abertura: new Date().toISOString().slice(0,10),
+      etapa_atual: primeiraEtapa.chave,
+      status_geral: 'em_andamento',
+    };
+    const inserted = await sbCall(
+      sb.from('corretora_sinistros').insert(payload).select().single(),
+      'Erro ao criar sinistro.'
+    );
+    if (!inserted) return;
+
+    // Cria histórico de todas as etapas previstas (datas previstas calculadas em cascata)
+    let cursor = new Date();
+    const historico = etapas.map((e, idx) => {
+      cursor = new Date(cursor.getTime() + (idx === 0 ? 0 : (etapas[idx-1].prazo_dias || 0)) * 86400000);
+      return {
+        sinistro_id: inserted.id,
+        etapa_chave: e.chave,
+        etapa_label: e.label,
+        data_prevista: cursor.toISOString().slice(0,10),
+        concluida_automaticamente: false,
+      };
+    });
+    await sbCall(sb.from('corretora_sinistro_etapas_historico').insert(historico), 'Aviso: histórico de etapas não pôde ser criado.');
+
+    showToast('Sinistro criado. Link de acompanhamento gerado para o cliente.');
+    closeModal();
+    renderSinistros();
+  };
+}
+
+async function openSinistroModal(s) {
+  const historico = await sbCall(sb.from('corretora_sinistro_etapas_historico').select('*').eq('sinistro_id', s.id).order('created_at'), 'Erro ao carregar etapas.') || [];
+  const anexos = await sbCall(sb.from('corretora_sinistro_anexos').select('*').eq('sinistro_id', s.id).order('created_at'), 'Erro ao carregar anexos.') || [];
+  const tipo = sinistroTipos.find(t => t.id === s.tipo_id);
+  const etapas = (tipo && tipo.etapas && tipo.etapas.length) ? tipo.etapas : SINISTRO_ETAPAS_PADRAO;
+  const publicUrl = `${window.location.origin}${window.location.pathname}?sinistro=${s.link_token}`;
+
+  const etapasHtml = etapas.map(e => {
+    const hist = (historico || []).find(h => h.etapa_chave === e.chave);
+    const done = hist && hist.data_concluida;
+    const isCurrent = s.etapa_atual === e.chave && !done;
+    return `
+      <div class="row-flex" style="padding:8px 0; border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <div style="font-weight:${isCurrent ? 600 : 500}; font-size:13px;">${escapeHtml(e.label)} ${isCurrent ? '<span class="chip" style="margin-left:6px;">atual</span>' : ''}</div>
+          <div class="text-muted" style="font-size:11.5px;">Prevista: ${fmtDate(hist?.data_prevista)} ${done ? '· concluída em ' + fmtDate(hist.data_concluida.slice(0,10)) : ''}</div>
+        </div>
+        ${!done ? `<button class="btn btn-sm btn-green" data-etapa="${e.chave}">Concluir etapa</button>` : '<span class="chip chip-green">✓ feito</span>'}
+      </div>`;
+  }).join('');
+
+  const anexosHtml = (anexos || []).map(a => `
+    <div class="row-flex" style="padding:6px 0;">
+      <span style="flex:1; font-size:12.5px;">📎 ${escapeHtml(a.nome_arquivo)}</span>
+      <a class="btn btn-sm" href="${sb.storage.from('corretora-sinistros').getPublicUrl(a.storage_path).data.publicUrl}" target="_blank">Ver</a>
+    </div>`).join('') || '<div class="text-muted" style="font-size:12px;">Nenhum anexo ainda.</div>';
+
+  const body = `
+    <div class="grid-2">
+      <div class="field"><label>Cliente</label><input id="f-cliente" value="${escapeHtml(s.cliente_nome)}"></div>
+      <div class="field"><label>Telefone</label><input id="f-telefone" value="${escapeHtml(s.cliente_telefone || '')}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Nº apólice</label><input id="f-apolice" value="${escapeHtml(s.apolice_numero || '')}"></div>
+      <div class="field"><label>Responsável</label><input id="f-responsavel" value="${escapeHtml(s.responsavel || '')}"></div>
+    </div>
+    <div class="field"><label>Motivo / observações</label><textarea id="f-obs" rows="2">${escapeHtml(s.observacoes || s.descricao || '')}</textarea></div>
+
+    <div class="field" style="background:var(--accent-light); padding:10px 12px; border-radius:var(--radius-sm);">
+      <label style="margin-bottom:3px;">Link de acompanhamento do cliente</label>
+      <div class="row-flex">
+        <input readonly value="${publicUrl}" style="font-size:11.5px; background:#fff;" id="public-link-input">
+        <button class="btn btn-sm" id="btn-copy-link">Copiar</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="font-size:15px; margin-top:20px;">Etapas</div>
+    ${etapasHtml}
+
+    <div class="section-title" style="font-size:15px;">Anexos</div>
+    ${anexosHtml}
+    <div class="field" style="margin-top:10px;">
+      <input type="file" id="f-anexo">
+    </div>
+
+    ${s.status_geral !== 'concluido' ? `
+    <div class="section-title" style="font-size:15px;">Encerrar sinistro</div>
+    <div class="grid-2">
+      <div class="field"><label>Valor final indenizado (R$)</label><input id="f-valor-final" type="number" step="0.01"></div>
+      <div class="field"><label>Motivo (para dashboard)</label><input id="f-motivo" placeholder="Ex: colisão, roubo..."></div>
+    </div>
+    ` : `<div class="chip chip-green">Sinistro concluído — valor: ${fmtMoney(s.valor_final)}</div>`}
+  `;
+  const footer = `
+    <button class="btn btn-danger" id="btn-del-sinistro">Excluir</button>
+    <div class="flex-1"></div>
+    <button class="btn" id="btn-cancel-sinistro">Cancelar</button>
+    <button class="btn btn-primary" id="btn-save-sinistro">Salvar</button>
+    ${s.status_geral !== 'concluido' ? '<button class="btn btn-green" id="btn-encerrar-sinistro">Encerrar</button>' : ''}
+  `;
+  openModal(`Sinistro ${s.codigo}`, body, footer);
+
+  document.getElementById('btn-copy-link').onclick = () => {
+    navigator.clipboard.writeText(publicUrl);
+    showToast('Link copiado!');
+  };
+  document.getElementById('btn-cancel-sinistro').onclick = closeModal;
+
+  document.getElementById('btn-del-sinistro').onclick = async () => {
+    if (!confirm('Excluir este sinistro e todo seu histórico? Esta ação não pode ser desfeita.')) return;
+    await sbCall(sb.from('corretora_sinistros').delete().eq('id', s.id), 'Erro ao excluir.');
+    closeModal();
+    showToast('Sinistro excluído.');
+    renderSinistros();
+  };
+
+  document.getElementById('btn-save-sinistro').onclick = async () => {
+    const payload = {
+      cliente_nome: document.getElementById('f-cliente').value.trim(),
+      cliente_telefone: document.getElementById('f-telefone').value.trim() || null,
+      apolice_numero: document.getElementById('f-apolice').value.trim() || null,
+      responsavel: document.getElementById('f-responsavel').value.trim() || null,
+      observacoes: document.getElementById('f-obs').value.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    await sbCall(sb.from('corretora_sinistros').update(payload).eq('id', s.id), 'Erro ao salvar.');
+    showToast('Sinistro atualizado.');
+    closeModal();
+    renderSinistros();
+  };
+
+  // Upload de anexo
+  const fileInput = document.getElementById('f-anexo');
+  fileInput.onchange = async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const path = `${s.id}/${Date.now()}_${file.name}`;
+    const { error } = await sb.storage.from('corretora-sinistros').upload(path, file);
+    if (error) { showToast('Erro ao enviar arquivo: ' + error.message, true); return; }
+    await sbCall(sb.from('corretora_sinistro_anexos').insert({
+      sinistro_id: s.id, nome_arquivo: file.name, storage_path: path, tamanho_bytes: file.size,
+    }), 'Erro ao salvar anexo.');
+    showToast('Anexo enviado.');
+    closeModal();
+    openSinistroModal(s); // reabre atualizado
+  };
+
+  // Concluir etapa
+  document.querySelectorAll('[data-etapa]').forEach(btn => {
+    btn.onclick = async () => {
+      const etapaChave = btn.dataset.etapa;
+      await sbCall(
+        sb.from('corretora_sinistro_etapas_historico')
+          .update({ data_concluida: new Date().toISOString() })
+          .eq('sinistro_id', s.id).eq('etapa_chave', etapaChave),
+        'Erro ao concluir etapa.'
+      );
+      // Avança etapa_atual para a próxima da lista
+      const idx = etapas.findIndex(e => e.chave === etapaChave);
+      const proxima = etapas[idx + 1];
+      if (proxima) {
+        await sbCall(sb.from('corretora_sinistros').update({ etapa_atual: proxima.chave, updated_at: new Date().toISOString() }).eq('id', s.id), 'Erro ao avançar etapa.');
+      }
+      showToast('Etapa concluída.');
+      closeModal();
+      const refreshed = await sbCall(sb.from('corretora_sinistros').select('*').eq('id', s.id).single(), 'Erro.');
+      if (refreshed) openSinistroModal(refreshed);
+      else renderSinistros();
+    };
+  });
+
+  // Encerrar sinistro
+  const btnEncerrar = document.getElementById('btn-encerrar-sinistro');
+  if (btnEncerrar) btnEncerrar.onclick = async () => {
+    const valorFinal = document.getElementById('f-valor-final').value;
+    const motivo = document.getElementById('f-motivo').value.trim();
+    if (!valorFinal) { showToast('Informe o valor final indenizado.', true); return; }
+    await sbCall(sb.from('corretora_sinistros').update({
+      status_geral: 'concluido',
+      valor_final: valorFinal,
+      motivo: motivo || s.tipo_nome,
+      data_resolucao: new Date().toISOString().slice(0,10),
+      etapa_atual: 'concluido',
+      updated_at: new Date().toISOString(),
+    }).eq('id', s.id), 'Erro ao encerrar.');
+    showToast('Sinistro encerrado.');
+    closeModal();
+    renderSinistros();
+  };
+}
+
+// ---------- Tipos de sinistro (config) ----------
+function openTiposSinistroModal() {
+  const body = `
+    <p class="text-muted" style="margin-top:0; font-size:12.5px;">Tipos cadastrados:</p>
+    <div id="tipos-lista">${sinistroTipos.map(t => `
+      <div class="row-flex" style="padding:8px 0; border-bottom:1px solid var(--border);">
+        <span style="flex:1; font-size:13px;">${escapeHtml(t.nome)}</span>
+        <span class="text-muted" style="font-size:11.5px;">${(t.etapas || []).length} etapas</span>
+      </div>`).join('') || '<div class="text-muted">Nenhum tipo cadastrado.</div>'}</div>
+    <div class="section-title" style="font-size:14px;">Novo tipo simples</div>
+    <div class="field"><label>Nome do tipo</label><input id="f-novo-tipo" placeholder="Ex: Incêndio"></div>
+    <p class="text-muted" style="font-size:11.5px;">Cria com etapas padrão (Acionamento → Documentos → Abertura na seguradora → Acompanhamento → Encerramento). Para ajustar prazos detalhadamente, peça ao time de operações o mapeamento e eu ajusto direto no banco.</p>
+  `;
+  const footer = `<button class="btn" id="btn-close-tipos">Fechar</button><button class="btn btn-primary" id="btn-add-tipo">Adicionar tipo</button>`;
+  openModal('Tipos de sinistro', body, footer);
+  document.getElementById('btn-close-tipos').onclick = closeModal;
+  document.getElementById('btn-add-tipo').onclick = async () => {
+    const nome = document.getElementById('f-novo-tipo').value.trim();
+    if (!nome) return;
+    const etapasPadrao = [
+      { chave: 'acionamento', label: 'Acionamento', prazo_dias: 0, automatica: false },
+      { chave: 'documentos', label: 'Documentos', prazo_dias: 3, automatica: false },
+      { chave: 'abertura_seguradora', label: 'Abertura na seguradora', prazo_dias: 1, automatica: false },
+      { chave: 'acompanhamento', label: 'Acompanhamento', prazo_dias: 15, automatica: true },
+      { chave: 'encerramento', label: 'Encerramento', prazo_dias: 5, automatica: false },
+    ];
+    await sbCall(sb.from('corretora_sinistro_tipos').insert({ nome, etapas: etapasPadrao }), 'Erro ao criar tipo.');
+    showToast('Tipo de sinistro criado.');
+    closeModal();
+    renderSinistros();
+  };
+}
+
+// ---------- Dashboard ----------
+async function loadSinistrosDashboard() {
+  const all = await sbCall(sb.from('corretora_sinistros').select('*'), 'Erro ao carregar dados.') || [];
+  const sub = document.getElementById('sinistros-subcontent');
+  if (all.length === 0) {
+    sub.innerHTML = `<div class="empty-state"><div class="big">📊</div>Sem dados suficientes ainda para o dashboard.</div>`;
+    return;
+  }
+  const concluidos = all.filter(s => s.status_geral === 'concluido');
+  const totalIndenizado = concluidos.reduce((sum, s) => sum + (Number(s.valor_final) || 0), 0);
+  const tempoMedio = concluidos.length
+    ? Math.round(concluidos.reduce((sum, s) => {
+        if (!s.data_abertura || !s.data_resolucao) return sum;
+        return sum + (new Date(s.data_resolucao) - new Date(s.data_abertura)) / 86400000;
+      }, 0) / concluidos.length)
+    : 0;
+
+  const porMotivo = {};
+  concluidos.forEach(s => { const m = s.motivo || s.tipo_nome || 'Outro'; porMotivo[m] = (porMotivo[m] || 0) + 1; });
+  const motivoRows = Object.entries(porMotivo).sort((a,b) => b[1]-a[1]);
+
+  sub.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Sinistros totais</div><div class="value">${all.length}</div></div>
+      <div class="stat-card"><div class="label">Em andamento</div><div class="value">${all.filter(s=>s.status_geral==='em_andamento').length}</div></div>
+      <div class="stat-card"><div class="label">Concluídos</div><div class="value">${concluidos.length}</div></div>
+      <div class="stat-card"><div class="label">Tempo médio</div><div class="value small">${tempoMedio} dias</div></div>
+      <div class="stat-card"><div class="label">Total indenizado</div><div class="value small">${fmtMoney(totalIndenizado)}</div></div>
+    </div>
+    <div class="section-title">Sinistros por motivo</div>
+    <div class="card card-pad">
+      <table>
+        <thead><tr><th>Motivo</th><th>Quantidade</th></tr></thead>
+        <tbody>${motivoRows.map(([m,c]) => `<tr><td>${escapeHtml(m)}</td><td>${c}</td></tr>`).join('') || '<tr><td colspan="2" class="text-muted">Sem sinistros concluídos ainda.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ---------- Página pública de acompanhamento do cliente ----------
+async function renderClientTracking(token) {
+  document.body.innerHTML = `<div style="max-width:520px; margin:60px auto; padding:0 20px; font-family:'DM Sans',sans-serif;">
+    <div id="tracking-content" style="text-align:center; padding:60px 0; color:#9C9890;">Carregando...</div>
+  </div>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">`;
+
+  // Usa função RPC segura: devolve só o sinistro do token exato, nunca a lista inteira
+  const { data, error } = await sb.rpc('corretora_get_sinistro_publico', { p_token: token });
+  const container = document.getElementById('tracking-content');
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row || !row.sinistro) {
+    container.innerHTML = `<p>Não encontramos esse sinistro. Verifique o link recebido.</p>`;
+    return;
+  }
+  const s = row.sinistro;
+  const historico = row.etapas || [];
+
+  container.style.textAlign = 'left';
+  container.innerHTML = `
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="font-family:'DM Serif Display',serif; font-size:22px; color:#2A3568;">Syros Financial</div>
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#9C9890; margin-top:4px;">Acompanhamento de sinistro</div>
+    </div>
+    <div style="background:#fff; border:1px solid #DDE0EC; border-radius:10px; padding:24px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+      <div style="font-family:'DM Serif Display',serif; font-size:19px; color:#1A1917;">${escapeHtml(s.cliente_nome)}</div>
+      <div style="font-size:12.5px; color:#5C5850; margin-top:2px;">${escapeHtml(s.tipo_nome)} · ${escapeHtml(s.codigo)}</div>
+      <div style="margin-top:18px;">
+        ${(historico || []).map(h => `
+          <div style="display:flex; gap:12px; padding:10px 0; border-bottom:1px solid #F2F3F7;">
+            <div style="width:18px; height:18px; border-radius:50%; flex-shrink:0; margin-top:2px; background:${h.data_concluida ? '#2DB863' : '#DDE0EC'};"></div>
+            <div>
+              <div style="font-size:13.5px; font-weight:500; color:#1A1917;">${escapeHtml(h.etapa_label)}</div>
+              <div style="font-size:11.5px; color:#9C9890;">${h.data_concluida ? 'Concluída em ' + fmtDate(h.data_concluida.slice(0,10)) : 'Previsão: ' + fmtDate(h.data_prevista)}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+      ${s.status_geral === 'concluido' ? `<div style="margin-top:16px; background:#E8F5ED; color:#1A6B3A; padding:10px 14px; border-radius:6px; font-size:13px;">Sinistro concluído. Valor: ${fmtMoney(s.valor_final)}</div>` : ''}
+    </div>
+    <p style="text-align:center; font-size:11.5px; color:#9C9890; margin-top:20px;">Dúvidas? Fale com a Syros Financial.</p>
+  `;
+}
+
+
+// ==== assistencias.js ====
+// ============================================================
+// ASSISTÊNCIAS
+// ============================================================
+
+const ASSISTENCIA_STATUS = [
+  { key: 'anotado', label: 'Anotado' },
+  { key: 'aberto', label: 'Aberto na seguradora' },
+  { key: 'aguardando_execucao', label: 'Aguardando execução' },
+  { key: 'executado', label: 'Executado' },
+  { key: 'finalizado', label: 'Finalizado' },
+];
+
+let assistenciaTipos = [];
+let assistenciasSubview = 'kanban';
+
+async function renderAssistencias() {
+  document.getElementById('page-meta').textContent = 'Abertura e acompanhamento de assistências';
+  document.getElementById('page-actions').innerHTML = `
+    <div class="row-flex">
+      <button class="btn" id="btn-tipos-assist">Tipos de assistência</button>
+      <button class="btn btn-primary" id="btn-nova-assist">+ Nova assistência</button>
+    </div>`;
+  document.getElementById('btn-nova-assist').onclick = () => openNovaAssistenciaModal();
+  document.getElementById('btn-tipos-assist').onclick = () => openTiposAssistenciaModal();
+
+  assistenciaTipos = await sbCall(sb.from('corretora_assistencia_tipos').select('*').eq('ativo', true), 'Erro ao carregar tipos.') || [];
+
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="subtabs">
+      <div class="subtab ${assistenciasSubview === 'kanban' ? 'active' : ''}" data-sub="kanban">Acompanhamento</div>
+      <div class="subtab ${assistenciasSubview === 'lembretes' ? 'active' : ''}" data-sub="lembretes">Lembretes de contato</div>
+      <div class="subtab ${assistenciasSubview === 'dashboard' ? 'active' : ''}" data-sub="dashboard">Dashboard</div>
+    </div>
+    <div id="assist-subcontent"></div>
+  `;
+  content.querySelectorAll('.subtab').forEach(el => {
+    el.addEventListener('click', () => { assistenciasSubview = el.dataset.sub; renderAssistencias(); });
+  });
+
+  if (assistenciasSubview === 'kanban') loadAssistenciasKanban();
+  else if (assistenciasSubview === 'lembretes') loadAssistenciasLembretes();
+  else loadAssistenciasDashboard();
+}
+
+async function loadAssistenciasKanban() {
+  const data = await sbCall(
+    sb.from('corretora_assistencias').select('*').neq('status', 'cancelado').order('created_at', { ascending: false }),
+    'Erro ao carregar assistências.'
+  ) || [];
+  const sub = document.getElementById('assist-subcontent');
+  if (data.length === 0) {
+    sub.innerHTML = `<div class="empty-state"><div class="big">🛟</div>Nenhuma assistência registrada ainda.</div>`;
+    return;
+  }
+  const byStatus = {};
+  ASSISTENCIA_STATUS.forEach(s => byStatus[s.key] = []);
+  data.forEach(a => { (byStatus[a.status] || byStatus['anotado']).push(a); });
+
+  sub.innerHTML = `<div class="kanban">${ASSISTENCIA_STATUS.map(s => {
+    const items = byStatus[s.key];
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header"><span>${s.label}</span><span class="kanban-col-count">${items.length}</span></div>
+        <div class="kanban-col-body">
+          ${items.map(a => renderAssistenciaCard(a)).join('') || '<div class="text-muted" style="font-size:12px;padding:8px;">Vazio</div>'}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  sub.querySelectorAll('.kanban-card').forEach(el => {
+    el.addEventListener('click', () => {
+      const a = data.find(x => x.id === el.dataset.id);
+      openAssistenciaModal(a);
+    });
+  });
+}
+
+function renderAssistenciaCard(a) {
+  let prazoInfo = '';
+  let urgentClass = '';
+  if (a.prazo_execucao && a.status !== 'executado' && a.status !== 'finalizado') {
+    const days = daysUntil(a.prazo_execucao);
+    if (days < 0) { urgentClass = 'urgent'; prazoInfo = `<span class="days-stuck days-danger">atrasado</span>`; }
+    else prazoInfo = `<span class="days-stuck days-ok">vence em ${days}d</span>`;
+  }
+  return `
+    <div class="kanban-card ${urgentClass}" data-id="${a.id}">
+      <div class="title">${escapeHtml(a.cliente_nome)}</div>
+      <div class="sub">${escapeHtml(a.tipo_nome)}</div>
+      <div class="row">
+        ${a.satisfacao_nota ? `<span class="chip chip-gold">★ ${a.satisfacao_nota}</span>` : '<span></span>'}
+        ${prazoInfo}
+      </div>
+    </div>`;
+}
+
+async function loadAssistenciasLembretes() {
+  const today = new Date().toISOString().slice(0,10);
+  const data = await sbCall(
+    sb.from('corretora_assistencias').select('*').eq('contato_realizado', false).not('data_lembrete_contato', 'is', null).order('data_lembrete_contato'),
+    'Erro ao carregar lembretes.'
+  ) || [];
+  const sub = document.getElementById('assist-subcontent');
+  if (data.length === 0) {
+    sub.innerHTML = `<div class="empty-state"><div class="big">✅</div>Nenhum lembrete de controle de qualidade pendente.</div>`;
+    return;
+  }
+  sub.innerHTML = `
+    <div class="card">
+      <table>
+        <thead><tr><th>Cliente</th><th>Tipo</th><th>Lembrete para</th><th></th></tr></thead>
+        <tbody>
+          ${data.map(a => {
+            const days = daysUntil(a.data_lembrete_contato);
+            const overdue = days < 0;
+            return `<tr>
+              <td>${escapeHtml(a.cliente_nome)}</td>
+              <td>${escapeHtml(a.tipo_nome)}</td>
+              <td>${fmtDate(a.data_lembrete_contato)} ${overdue ? '<span class="chip chip-danger">atrasado</span>' : ''}</td>
+              <td><button class="btn btn-sm" data-id="${a.id}">Abrir</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  sub.querySelectorAll('[data-id]').forEach(btn => {
+    btn.onclick = async () => {
+      const a = data.find(x => x.id === btn.dataset.id);
+      openAssistenciaModal(a);
+    };
+  });
+}
+
+async function loadAssistenciasDashboard() {
+  const all = await sbCall(sb.from('corretora_assistencias').select('*'), 'Erro ao carregar dados.') || [];
+  const sub = document.getElementById('assist-subcontent');
+  if (all.length === 0) {
+    sub.innerHTML = `<div class="empty-state"><div class="big">📊</div>Sem dados suficientes para o dashboard ainda.</div>`;
+    return;
+  }
+  const finalizados = all.filter(a => a.status === 'finalizado' && a.data_abertura);
+  const tempoMedio = finalizados.length
+    ? Math.round(finalizados.reduce((sum, a) => {
+        const abertura = new Date(a.data_abertura);
+        const fim = a.updated_at ? new Date(a.updated_at) : abertura;
+        return sum + (fim - abertura) / 86400000;
+      }, 0) / finalizados.length)
+    : 0;
+  const notas = all.filter(a => a.satisfacao_nota).map(a => a.satisfacao_nota);
+  const satisfacaoMedia = notas.length ? (notas.reduce((a,b)=>a+b,0) / notas.length).toFixed(1) : '—';
+
+  const porTipo = {};
+  all.forEach(a => { porTipo[a.tipo_nome] = (porTipo[a.tipo_nome] || 0) + 1; });
+  const tipoRows = Object.entries(porTipo).sort((a,b) => b[1]-a[1]);
+
+  sub.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Assistências totais</div><div class="value">${all.length}</div></div>
+      <div class="stat-card"><div class="label">Tempo médio</div><div class="value small">${tempoMedio} dias</div></div>
+      <div class="stat-card"><div class="label">Satisfação média</div><div class="value small">★ ${satisfacaoMedia}</div></div>
+      <div class="stat-card"><div class="label">Finalizadas</div><div class="value">${finalizados.length}</div></div>
+    </div>
+    <div class="section-title">Tipos mais frequentes</div>
+    <div class="card card-pad">
+      <table>
+        <thead><tr><th>Tipo</th><th>Quantidade</th></tr></thead>
+        <tbody>${tipoRows.map(([t,c]) => `<tr><td>${escapeHtml(t)}</td><td>${c}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderCamposDinamicos(tipo, dadosExistentes) {
+  const campos = tipo?.campos || [];
+  dadosExistentes = dadosExistentes || {};
+  return campos.map(c => `
+    <div class="field">
+      <label>${escapeHtml(c.label)}</label>
+      ${c.tipo === 'textarea'
+        ? `<textarea data-campo="${c.chave}" rows="2">${escapeHtml(dadosExistentes[c.chave] || '')}</textarea>`
+        : `<input data-campo="${c.chave}" value="${escapeHtml(dadosExistentes[c.chave] || '')}">`}
+    </div>`).join('');
+}
+
+function openNovaAssistenciaModal() {
+  if (assistenciaTipos.length === 0) {
+    showToast('Cadastre um tipo de assistência primeiro.', true);
+    openTiposAssistenciaModal();
+    return;
+  }
+  const tipoOptions = assistenciaTipos.map(t => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
+  const body = `
+    <div class="grid-2">
+      <div class="field"><label>Cliente</label><input id="f-cliente"></div>
+      <div class="field"><label>Telefone</label><input id="f-telefone"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Nº apólice</label><input id="f-apolice"></div>
+      <div class="field"><label>Tipo de assistência</label><select id="f-tipo">${tipoOptions}</select></div>
+    </div>
+    <div id="campos-dinamicos"></div>
+  `;
+  const footer = `<button class="btn" id="btn-cancel">Cancelar</button><button class="btn btn-primary" id="btn-create">Registrar</button>`;
+  openModal('Nova assistência', body, footer);
+
+  const renderCampos = () => {
+    const tipo = assistenciaTipos.find(t => t.id === document.getElementById('f-tipo').value);
+    document.getElementById('campos-dinamicos').innerHTML = renderCamposDinamicos(tipo);
+  };
+  document.getElementById('f-tipo').onchange = renderCampos;
+  renderCampos();
+
+  document.getElementById('btn-cancel').onclick = closeModal;
+  document.getElementById('btn-create').onclick = async () => {
+    const cliente = document.getElementById('f-cliente').value.trim();
+    if (!cliente) { showToast('Informe o cliente.', true); return; }
+    const tipo = assistenciaTipos.find(t => t.id === document.getElementById('f-tipo').value);
+    const dados = {};
+    document.querySelectorAll('[data-campo]').forEach(el => { dados[el.dataset.campo] = el.value.trim(); });
+
+    await sbCall(sb.from('corretora_assistencias').insert({
+      cliente_nome: cliente,
+      cliente_telefone: document.getElementById('f-telefone').value.trim() || null,
+      apolice_numero: document.getElementById('f-apolice').value.trim() || null,
+      tipo_id: tipo.id,
+      tipo_nome: tipo.nome,
+      dados_coletados: dados,
+      status: 'anotado',
+    }), 'Erro ao registrar.');
+    showToast('Assistência registrada.');
+    closeModal();
+    renderAssistencias();
+  };
+}
+
+function openAssistenciaModal(a) {
+  const tipo = assistenciaTipos.find(t => t.id === a.tipo_id);
+  const statusOptions = ASSISTENCIA_STATUS.map(s => `<option value="${s.key}" ${a.status === s.key ? 'selected' : ''}>${s.label}</option>`).join('');
+
+  const body = `
+    <div class="grid-2">
+      <div class="field"><label>Cliente</label><input id="f-cliente" value="${escapeHtml(a.cliente_nome)}"></div>
+      <div class="field"><label>Telefone</label><input id="f-telefone" value="${escapeHtml(a.cliente_telefone || '')}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Nº apólice</label><input id="f-apolice" value="${escapeHtml(a.apolice_numero || '')}"></div>
+      <div class="field"><label>Tipo</label><input value="${escapeHtml(a.tipo_nome)}" disabled></div>
+    </div>
+    <div id="campos-dinamicos">${renderCamposDinamicos(tipo, a.dados_coletados)}</div>
+
+    <div class="grid-2">
+      <div class="field"><label>Status</label><select id="f-status">${statusOptions}</select></div>
+      <div class="field"><label>Prazo de execução</label><input id="f-prazo" type="date" value="${a.prazo_execucao || ''}"></div>
+    </div>
+    <div class="field">
+      <label>
+        <input type="checkbox" id="f-marcar-aberto" ${a.data_abertura ? 'checked disabled' : ''} style="width:auto; margin-right:6px;">
+        Abertura feita na seguradora ${a.data_abertura ? '(em ' + fmtDate(a.data_abertura) + ')' : ''}
+      </label>
+    </div>
+    <div class="field"><label>Data de lembrete (controle de qualidade)</label><input id="f-lembrete" type="date" value="${a.data_lembrete_contato || ''}"></div>
+    <div class="field">
+      <label><input type="checkbox" id="f-contato-feito" ${a.contato_realizado ? 'checked' : ''} style="width:auto; margin-right:6px;"> Contato de controle de qualidade já realizado</label>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Resultado</label><input id="f-resultado" value="${escapeHtml(a.resultado || '')}" placeholder="Deu certo? Como ficou?"></div>
+      <div class="field"><label>Satisfação (1-5)</label><input id="f-satisfacao" type="number" min="1" max="5" value="${a.satisfacao_nota || ''}"></div>
+    </div>
+    <div class="field"><label>Observações</label><textarea id="f-obs" rows="2">${escapeHtml(a.observacoes || '')}</textarea></div>
+  `;
+  const footer = `
+    <button class="btn btn-danger" id="btn-del">Excluir</button>
+    <div class="flex-1"></div>
+    <button class="btn" id="btn-cancel">Cancelar</button>
+    <button class="btn btn-primary" id="btn-save">Salvar</button>
+  `;
+  openModal(`Assistência — ${escapeHtml(a.cliente_nome)}`, body, footer);
+
+  document.getElementById('btn-cancel').onclick = closeModal;
+  document.getElementById('btn-del').onclick = async () => {
+    if (!confirm('Excluir esta assistência?')) return;
+    await sbCall(sb.from('corretora_assistencias').delete().eq('id', a.id), 'Erro ao excluir.');
+    closeModal();
+    showToast('Assistência excluída.');
+    renderAssistencias();
+  };
+
+  document.getElementById('btn-save').onclick = async () => {
+    const dados = {};
+    document.querySelectorAll('[data-campo]').forEach(el => { dados[el.dataset.campo] = el.value.trim(); });
+    const marcouAberturaAgora = !a.data_abertura && document.getElementById('f-marcar-aberto').checked;
+
+    const payload = {
+      cliente_nome: document.getElementById('f-cliente').value.trim(),
+      cliente_telefone: document.getElementById('f-telefone').value.trim() || null,
+      apolice_numero: document.getElementById('f-apolice').value.trim() || null,
+      dados_coletados: dados,
+      status: document.getElementById('f-status').value,
+      prazo_execucao: document.getElementById('f-prazo').value || null,
+      data_lembrete_contato: document.getElementById('f-lembrete').value || null,
+      contato_realizado: document.getElementById('f-contato-feito').checked,
+      resultado: document.getElementById('f-resultado').value.trim() || null,
+      satisfacao_nota: document.getElementById('f-satisfacao').value || null,
+      observacoes: document.getElementById('f-obs').value.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (marcouAberturaAgora) {
+      payload.data_abertura = new Date().toISOString();
+      payload.status = payload.status === 'anotado' ? 'aberto' : payload.status;
+    }
+    await sbCall(sb.from('corretora_assistencias').update(payload).eq('id', a.id), 'Erro ao salvar.');
+    showToast('Assistência atualizada.');
+    closeModal();
+    renderAssistencias();
+  };
+}
+
+function openTiposAssistenciaModal() {
+  const body = `
+    <div id="tipos-lista">${assistenciaTipos.map(t => `
+      <div class="row-flex" style="padding:8px 0; border-bottom:1px solid var(--border);">
+        <span style="flex:1; font-size:13px;">${escapeHtml(t.nome)}</span>
+        <span class="text-muted" style="font-size:11.5px;">${(t.campos || []).length} campos</span>
+      </div>`).join('') || '<div class="text-muted">Nenhum tipo cadastrado.</div>'}</div>
+    <div class="section-title" style="font-size:14px;">Novo tipo</div>
+    <div class="field"><label>Nome do tipo</label><input id="f-novo-tipo" placeholder="Ex: Encanador"></div>
+    <div class="field"><label>Campos (separados por vírgula)</label><input id="f-novo-campos" placeholder="Ex: Endereço, Tipo de problema"></div>
+    <p class="text-muted" style="font-size:11.5px;">Esses campos vão aparecer como texto livre rápido de preencher durante a ligação.</p>
+  `;
+  const footer = `<button class="btn" id="btn-close">Fechar</button><button class="btn btn-primary" id="btn-add">Adicionar tipo</button>`;
+  openModal('Tipos de assistência', body, footer);
+  document.getElementById('btn-close').onclick = closeModal;
+  document.getElementById('btn-add').onclick = async () => {
+    const nome = document.getElementById('f-novo-tipo').value.trim();
+    const camposRaw = document.getElementById('f-novo-campos').value.trim();
+    if (!nome) return;
+    const campos = camposRaw.split(',').map(c => c.trim()).filter(Boolean).map(label => ({
+      chave: label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_'),
+      label, tipo: 'text',
+    }));
+    await sbCall(sb.from('corretora_assistencia_tipos').insert({ nome, campos }), 'Erro ao criar tipo.');
+    showToast('Tipo de assistência criado.');
+    closeModal();
+    renderAssistencias();
+  };
+}
+
+
+// ==== app.js ====
+// ============================================================
+// SYROS OPERACIONAL — Núcleo do app
+// ============================================================
+
+const VIEWS = [
+  { key: 'propostas', label: 'Propostas', icon: '01' },
+  { key: 'parcelas', label: 'Parcelas', icon: '02' },
+  { key: 'sinistros', label: 'Sinistros', icon: '03' },
+  { key: 'assistencias', label: 'Assistências', icon: '04' },
+];
+
+let currentView = 'propostas';
+
+// ---------- Helpers gerais ----------
+function fmtDate(d) {
+  if (!d) return '—';
+  const date = new Date(d + (d.length === 10 ? 'T00:00:00' : ''));
+  if (isNaN(date)) return '—';
+  return date.toLocaleDateString('pt-BR');
+}
+function fmtMoney(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  const then = new Date(dateStr + (dateStr.length === 10 ? 'T00:00:00' : ''));
+  const now = new Date();
+  return Math.floor((now - then) / (1000 * 60 * 60 * 24));
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const target = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  return Math.floor((target - now) / (1000 * 60 * 60 * 24));
+}
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' danger' : '');
+  setTimeout(() => { t.className = 'toast'; }, 3200);
+}
+
+async function sbCall(promise, errMsg) {
+  const { data, error } = await promise;
+  if (error) {
+    console.error(error);
+    showToast(errMsg || ('Erro: ' + error.message), true);
+    return null;
+  }
+  return data;
+}
+
+// ---------- Modal ----------
+function openModal(title, bodyHtml, footerHtml) {
+  let overlay = document.getElementById('modal-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modal-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="modal-title"></h2>
+          <button class="modal-close" id="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+  }
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-footer').innerHTML = footerHtml || '';
+  overlay.classList.add('show');
+}
+function closeModal() {
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+// ---------- Navegação ----------
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = VIEWS.map(v => `
+    <div class="nav-item ${v.key === currentView ? 'active' : ''}" data-view="${v.key}">
+      <span class="icon">${v.icon}</span><span>${v.label}</span>
+    </div>
+  `).join('');
+  nav.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => switchView(el.dataset.view));
+  });
+}
+
+function switchView(viewKey) {
+  currentView = viewKey;
+  renderNav();
+  document.getElementById('page-actions').innerHTML = '';
+  const titles = { propostas: 'Propostas', parcelas: 'Parcelas', sinistros: 'Sinistros', assistencias: 'Assistências' };
+  document.getElementById('page-title').textContent = titles[viewKey];
+  const content = document.getElementById('content');
+  content.innerHTML = `<div class="empty-state"><span class="spinner"></span></div>`;
+
+  if (viewKey === 'propostas') renderPropostas();
+  else if (viewKey === 'parcelas') renderParcelas();
+  else if (viewKey === 'sinistros') renderSinistros();
+  else if (viewKey === 'assistencias') renderAssistencias();
+}
+
+// ---------- Autenticação ----------
+// Login simples por usuário (mapeado para e-mail interno @syros.local)
+function usernameToEmail(username) {
+  return username.trim().toLowerCase() + '@syros.local';
+}
+
+async function attemptLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!user || !pass) return;
+
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: usernameToEmail(user),
+    password: pass,
+  });
+  if (error) {
+    errEl.textContent = 'Usuário ou senha incorretos.';
+    errEl.style.display = 'block';
+    return;
+  }
+  showApp(data.user);
+}
+
+function showApp(user) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-layout').style.display = 'flex';
+  const username = (user.email || '').split('@')[0];
+  document.getElementById('sidebar-footer').textContent = `Conectado: ${username}`;
+  renderNav();
+  switchView('propostas');
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-layout').style.display = 'none';
+}
+
+async function handleLogout() {
+  await sb.auth.signOut();
+  showLogin();
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+// ---------- Boot ----------
+window.addEventListener('DOMContentLoaded', async () => {
+  // Se a URL tiver ?sinistro=TOKEN, abre a página pública do cliente — não exige login
+  const params = new URLSearchParams(window.location.search);
+  const trackToken = params.get('sinistro');
+  if (trackToken) {
+    document.getElementById('login-screen').style.display = 'none';
+    renderClientTracking(trackToken);
+    return;
+  }
+
+  document.getElementById('login-submit').onclick = attemptLogin;
+  document.getElementById('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
+  document.getElementById('login-user').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
+  document.getElementById('btn-logout').onclick = handleLogout;
+
+  // Verifica se já existe sessão ativa (evita pedir login de novo a cada refresh)
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && session.user) {
+    showApp(session.user);
+  } else {
+    showLogin();
+  }
+});
+
+
+</script>
+</body>
+</html>

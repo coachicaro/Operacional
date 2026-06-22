@@ -3,8 +3,292 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Syros Operacional</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>Syros Financial · Painel Operacional</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F3F7;--surface:#fff;--border:#DDE0EC;
+  --text:#1A1917;--text-2:#5C5850;--text-3:#9C9890;
+  --accent:#2A3568;--accent-light:#E8EAF3;--accent-text:#1A2050;
+  --danger:#C0392B;--danger-light:#FDECEA;
+  --green:#166534;--green-light:#dcfce7;
+  --gold:#E8A020;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* LOADING */
+.app-loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:10000}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* AUTH */
+.auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e2850,#2A3568,#3d4f8a);padding:20px}
+.auth-card{background:var(--surface);border-radius:16px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,0.25)}
+.auth-logo{font-family:'DM Serif Display',serif;font-size:26px;color:var(--accent);margin-bottom:2px;text-align:center}
+.auth-sub{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:32px;text-align:center}
+.auth-err{background:var(--danger-light);color:var(--danger);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+
+/* FIELDS & BTNS */
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field label{font-size:12px;font-weight:500;color:var(--text-2)}
+.field input,.field select,.field textarea{padding:9px 12px;font-size:13px;font-family:'DM Sans',sans-serif;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);outline:none;transition:border .15s,box-shadow .15s;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(42,53,104,.08);background:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#1e2850}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border)}.btn-ghost:hover{background:var(--bg)}
+.btn-success{background:var(--green-light);color:var(--green);border:1px solid #bbf7d0}
+.btn-green{background:var(--green);color:#fff;border:none}
+.btn-green:hover{background:#14532d}
+.btn-danger{background:var(--danger-light);color:var(--danger);border:1px solid #f5c6c2}
+.btn-full{width:100%;margin-top:6px}
+.btn-sm{padding:6px 12px;font-size:12px}
+.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+
+/* LAYOUT */
+.app{display:none}
+.app.visible{display:grid;grid-template-columns:240px 1fr;width:100%;height:100vh;overflow:hidden}
+.sidebar{background:var(--accent);color:#fff;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar-logo .brand{font-family:'DM Serif Display',serif;font-size:20px;color:#fff;letter-spacing:-.3px}
+.sidebar-logo .sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;text-transform:uppercase;letter-spacing:.08em}
+.sidebar-nav{padding:16px 0;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.7);border-left:3px solid transparent;transition:all .15s;user-select:none}
+.nav-item:hover{color:#fff;background:rgba(255,255,255,.06)}
+.nav-item.active{color:#fff;background:rgba(255,255,255,.10);border-left-color:var(--gold);font-weight:500}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+.sidebar-footer{padding:16px 24px;border-top:1px solid rgba(255,255,255,.1)}
+.user-info{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:10px;line-height:1.5}
+.user-info strong{color:#fff;display:block;font-size:13px}
+.btn-logout{display:flex;align-items:center;gap:7px;padding:8px 0;font-size:12.5px;color:rgba(255,255,255,.45);cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;margin-top:6px;transition:color .15s}
+.btn-logout:hover{color:#fff}
+
+.main{overflow-y:auto;overflow-x:hidden;height:100vh}
+.view{display:none;padding:36px 40px;max-width:1200px}
+.view.active{display:block}
+.page-title{font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);letter-spacing:-.5px;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--text-2);margin-bottom:24px}
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.page-header-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);margin-bottom:20px}
+.card-pad{padding:20px 24px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:16px}
+.section-title{font-family:'DM Serif Display',serif;font-size:17px;margin:24px 0 14px}
+.section-title:first-child{margin-top:0}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat-card .label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:6px}
+.stat-card .value{font-family:'DM Serif Display',serif;font-size:24px;color:var(--text)}
+.stat-card .value.small{font-size:18px}
+
+/* SUBTABS */
+.subtabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)}
+.subtab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;user-select:none}
+.subtab:hover{color:var(--text)}
+.subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* GRID forms */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row-flex{display:flex;gap:10px;align-items:center}
+.flex-1{flex:1}
+.text-muted{color:var(--text-3)}
+
+/* KANBAN */
+.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:260px;gap:14px;overflow-x:auto;padding-bottom:16px}
+.kanban-col{background:var(--bg);border-radius:var(--radius);border:1px solid var(--border);display:flex;flex-direction:column;max-height:calc(100vh - 280px)}
+.kanban-col-header{padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);border-radius:var(--radius) var(--radius) 0 0}
+.kanban-col-count{background:rgba(42,53,104,.1);color:var(--accent);border-radius:99px;padding:1px 8px;font-size:11px}
+.kanban-col-body{padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
+.kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 13px;cursor:pointer;transition:all .15s;box-shadow:var(--shadow)}
+.kanban-card:hover{border-color:#B8BDCF;transform:translateY(-1px)}
+.kanban-card.urgent{border-color:var(--danger);background:var(--danger-light)}
+.kanban-card .title{font-weight:600;font-size:13.5px;margin-bottom:4px}
+.kanban-card .sub{font-size:11.5px;color:var(--text-2);margin-bottom:6px}
+.kanban-card .row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.days-stuck{font-size:11px;font-weight:600}
+.days-ok{color:var(--text-3)}
+.days-warn{color:var(--gold)}
+.days-danger{color:var(--danger)}
+
+/* CHIPS */
+.chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:500;background:var(--accent-light);color:var(--accent-text);border:1px solid rgba(42,53,104,.15);white-space:nowrap}
+.chip-green{background:var(--green-light);color:var(--green);border-color:#bbf7d0}
+.chip-danger{background:var(--danger-light);color:var(--danger);border-color:#f5c6c2}
+.chip-gold{background:var(--gold);color:#fff;border:none}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--bg);padding:10px 14px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:var(--bg)}
+tbody tr:last-child{border-bottom:none}
+tbody td{padding:11px 14px;vertical-align:middle}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:640px;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-family:'DM Serif Display',serif;font-size:18px;color:var(--text)}
+.modal-close{cursor:pointer;color:var(--text-3);font-size:20px;line-height:1;background:none;border:none}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;right:28px;background:var(--text);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;max-width:320px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:var(--green)}
+.toast.error{background:var(--danger)}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:48px 0;color:var(--text-3);font-size:13.5px}
+.empty-state .icon{font-size:36px;margin-bottom:10px}
+
+/* FATAL ERROR BANNER */
+.fatal-error-box{position:fixed;top:0;left:0;right:0;background:var(--danger);color:#fff;padding:12px 16px;font-family:'DM Sans',sans-serif;font-size:13px;z-index:10001;text-align:center}
+
+/* MOBILE NAV */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:64px;background:var(--accent);border-top:1px solid rgba(255,255,255,.1);z-index:9999;align-items:stretch;overflow-x:auto;-webkit-tap-highlight-color:transparent}
+.mobile-nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55);cursor:pointer;padding:6px 18px;transition:color .15s;user-select:none;flex:0 0 auto;min-width:72px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;background:none;border:none;font-family:inherit;font-size:inherit}
+.mobile-nav-item.active{color:#fff}
+.mobile-nav-item .mn-icon{font-size:18px;line-height:1}
+.mobile-nav-item .mn-label{font-size:9.5px;font-weight:500;letter-spacing:.04em}
+
+@media(max-width:768px){
+  .app.visible{display:flex;flex-direction:column;height:auto;min-height:100vh;grid-template-columns:unset}
+  .sidebar{display:none!important}
+  .mobile-nav{display:flex!important}
+  .main{height:auto!important;min-height:calc(100vh - 64px);overflow-y:auto;padding-bottom:72px;width:100%;box-sizing:border-box}
+  .view{padding:20px 16px}
+  .grid-2{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .page-header{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div class="app-loading" id="appLoading"><div class="spinner"></div></div>
+
+<!-- AUTH -->
+<div class="auth-screen" id="authScreen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">Syros</div>
+    <div class="auth-sub">Painel Operacional</div>
+    <div id="loginErr" class="auth-err"></div>
+    <div class="field"><label>Usuário</label><input type="text" id="loginUser" placeholder="admin" autocomplete="username"></div>
+    <div class="field"><label>Senha</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')fazerLogin()"></div>
+    <button class="btn btn-primary btn-full" id="btnLogin" onclick="fazerLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="appMain">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="brand">Syros</div>
+      <div class="sub">Painel Operacional</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showView('propostas')" id="nav-propostas"><span class="icon">📄</span> Propostas</div>
+      <div class="nav-item" onclick="showView('parcelas')" id="nav-parcelas"><span class="icon">💳</span> Parcelas</div>
+      <div class="nav-item" onclick="showView('sinistros')" id="nav-sinistros"><span class="icon">🗂️</span> Sinistros</div>
+      <div class="nav-item" onclick="showView('assistencias')" id="nav-assistencias"><span class="icon">🛟</span> Assistências</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info"><strong id="sidebarNome">—</strong></div>
+      <button class="btn-logout" onclick="fazerLogout()">⬅ Sair</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div class="view active" id="view-propostas">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Propostas</div>
+          <p class="page-sub">Funil de propostas — Discord → SEGFY → seguradora → cliente</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" onclick="openImportPropostasModal()">Importar lista do SEGFY</button>
+          <button class="btn btn-primary" onclick="openPropostaModal(null)">+ Nova proposta</button>
+        </div>
+      </div>
+      <div id="propostas-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
+    </div>
+
+    <div class="view" id="view-parcelas">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Parcelas</div>
+          <p class="page-sub">Controle de parcelas em atraso, até o envio do boleto</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" onclick="openImportParcelasModal()">Importar lista</button>
+          <button class="btn btn-primary" onclick="openParcelaModal(null)">+ Nova parcela</button>
+        </div>
+      </div>
+      <div id="parcelas-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
+    </div>
+
+    <div class="view" id="view-sinistros">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Sinistros</div>
+          <p class="page-sub">Abertura, acompanhamento e indicadores de sinistros</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" onclick="openTiposSinistroModal()">Tipos de sinistro</button>
+          <button class="btn btn-primary" onclick="openNovoSinistroModal()">+ Novo sinistro</button>
+        </div>
+      </div>
+      <div class="subtabs">
+        <div class="subtab active" data-sub="kanban" onclick="setSinistrosSubview('kanban')">Acompanhamento</div>
+        <div class="subtab" data-sub="dashboard" onclick="setSinistrosSubview('dashboard')">Dashboard</div>
+      </div>
+      <div id="sinistros-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
+    </div>
+
+    <div class="view" id="view-assistencias">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Assistências</div>
+          <p class="page-sub">Abertura e acompanhamento de assistências</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" onclick="openTiposAssistenciaModal()">Tipos de assistência</button>
+          <button class="btn btn-primary" onclick="openNovaAssistenciaModal()">+ Nova assistência</button>
+        </div>
+      </div>
+      <div class="subtabs">
+        <div class="subtab active" data-sub="kanban" onclick="setAssistenciasSubview('kanban')">Acompanhamento</div>
+        <div class="subtab" data-sub="lembretes" onclick="setAssistenciasSubview('lembretes')">Lembretes de contato</div>
+        <div class="subtab" data-sub="dashboard" onclick="setAssistenciasSubview('dashboard')">Dashboard</div>
+      </div>
+      <div id="assistencias-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
+    </div>
+
+  </main>
+</div>
+
+<nav class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-item active" id="mnav-propostas" onclick="showView('propostas')"><span class="mn-icon">📄</span><span class="mn-label">Propostas</span></button>
+  <button class="mobile-nav-item" id="mnav-parcelas" onclick="showView('parcelas')"><span class="mn-icon">💳</span><span class="mn-label">Parcelas</span></button>
+  <button class="mobile-nav-item" id="mnav-sinistros" onclick="showView('sinistros')"><span class="mn-icon">🗂️</span><span class="mn-label">Sinistros</span></button>
+  <button class="mobile-nav-item" id="mnav-assistencias" onclick="showView('assistencias')"><span class="mn-icon">🛟</span><span class="mn-label">Assistências</span></button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
 <script>
 (function loadSupabaseLib() {
   const sources = [
@@ -14,10 +298,7 @@
   ];
   let i = 0;
   function tryNext() {
-    if (i >= sources.length) {
-      window.SUPABASE_LIB_FAILED = true;
-      return;
-    }
+    if (i >= sources.length) { window.SUPABASE_LIB_FAILED = true; return; }
     const s = document.createElement('script');
     s.src = sources[i];
     s.onerror = function () { i++; tryNext(); };
@@ -26,495 +307,6 @@
   tryNext();
 })();
 </script>
-<style>
-:root {
-  --bg: #F2F3F7;
-  --surface: #FFFFFF;
-  --surface-subtle: #F5F6FA;
-  --border: #DDE0EC;
-  --border-strong: #B8BDCF;
-  --text: #1A1917;
-  --text-2: #5C5850;
-  --text-3: #9C9890;
-  --accent: #2A3568;
-  --accent-dark: #1f2854;
-  --accent-light: #E8EAF3;
-  --accent-text: #1A2050;
-  --gold: #E8A020;
-  --green: #2DB863;
-  --green-dark: #1A6B3A;
-  --green-light: #E8F5ED;
-  --danger: #C0392B;
-  --danger-light: #FDECEA;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-}
-.layout { display: flex; min-height: 100vh; }
-
-/* Sidebar */
-.sidebar {
-  width: 240px;
-  background: var(--accent);
-  color: #fff;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  top: 0; left: 0; bottom: 0;
-}
-.sidebar-brand {
-  padding: 24px 24px 18px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar-brand .name {
-  font-family: 'DM Serif Display', serif;
-  font-size: 20px;
-}
-.sidebar-brand .sub {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.5);
-  margin-top: 4px;
-}
-.nav { padding: 12px 0; flex: 1; }
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 24px;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-  color: rgba(255,255,255,0.75);
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: all 0.15s;
-  user-select: none;
-}
-.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
-.nav-item.active {
-  background: rgba(255,255,255,0.10);
-  border-left-color: var(--gold);
-  color: #fff;
-}
-.nav-item .icon { width: 18px; text-align: center; opacity: 0.9; }
-.sidebar-footer {
-  padding: 16px 24px;
-  font-size: 11px;
-  color: rgba(255,255,255,0.35);
-  border-top: 1px solid rgba(255,255,255,0.1);
-}
-
-/* Main */
-.main { margin-left: 240px; flex: 1; min-width: 0; }
-.topbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 18px 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.topbar h1 {
-  font-family: 'DM Serif Display', serif;
-  font-size: 22px;
-  font-weight: 400;
-  margin: 0;
-}
-.topbar .meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.content { padding: 28px 32px 60px; }
-
-/* Buttons */
-.btn {
-  background: #fff;
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 9px 16px;
-  border-radius: var(--radius-sm);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.btn:hover { background: var(--surface-subtle); border-color: var(--border-strong); }
-.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-.btn-primary:hover { background: var(--accent-dark); }
-.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
-.btn-green:hover { background: var(--green-dark); }
-.btn-danger { color: var(--danger); border-color: #F5C0BB; background: var(--danger-light); }
-.btn-sm { padding: 6px 12px; font-size: 12px; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* Cards */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-.card-pad { padding: 20px 24px; }
-
-/* Inputs */
-input, select, textarea {
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-subtle);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13.5px;
-  color: var(--text);
-  width: 100%;
-}
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(42,53,104,0.08);
-  background: #fff;
-}
-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-2);
-  display: block;
-  margin-bottom: 5px;
-}
-.field { margin-bottom: 14px; }
-
-/* Badges/chips */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 500;
-  background: var(--accent-light);
-  color: var(--accent-text);
-  border: 1px solid rgba(42,53,104,0.15);
-  white-space: nowrap;
-}
-.chip-green { background: var(--green-light); color: var(--green-dark); border-color: rgba(45,184,99,0.25); }
-.chip-danger { background: var(--danger-light); color: var(--danger); border-color: rgba(192,57,43,0.25); }
-.chip-gold { background: var(--gold); color: #fff; }
-
-/* Tabs content visibility */
-.view { display: none; }
-.view.active { display: block; }
-
-/* Loading / empty */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-3);
-}
-.empty-state .big { font-size: 32px; margin-bottom: 8px; }
-.spinner {
-  width: 18px; height: 18px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  display: inline-block;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  background: var(--accent);
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: var(--shadow-lg);
-  z-index: 999;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: all 0.25s;
-  pointer-events: none;
-}
-.toast.show { opacity: 1; transform: translateY(0); }
-.toast.danger { background: var(--danger); }
-
-/* Modal */
-.modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(26,25,23,0.45);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  width: 100%;
-  max-width: 560px;
-  max-height: 88vh;
-  overflow-y: auto;
-}
-.modal-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.modal-header h2 {
-  font-family: 'DM Serif Display', serif;
-  font-size: 19px;
-  font-weight: 400;
-  margin: 0;
-}
-.modal-close { cursor: pointer; color: var(--text-3); font-size: 20px; line-height: 1; background: none; border: none; }
-.modal-body { padding: 20px 24px; }
-.modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-/* Kanban */
-.kanban {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 260px;
-  gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-}
-.kanban-col {
-  background: var(--surface-subtle);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 220px);
-}
-.kanban-col-header {
-  padding: 12px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-2);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  background: var(--surface-subtle);
-  border-radius: var(--radius) var(--radius) 0 0;
-}
-.kanban-col-count {
-  background: rgba(42,53,104,0.1);
-  color: var(--accent);
-  border-radius: 99px;
-  padding: 1px 8px;
-  font-size: 11px;
-}
-.kanban-col-body {
-  padding: 10px;
-  overflow-y: auto;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.kanban-card {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-  box-shadow: var(--shadow);
-}
-.kanban-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
-.kanban-card.urgent { border-color: var(--danger); background: var(--danger-light); }
-.kanban-card .title { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
-.kanban-card .sub { font-size: 11.5px; color: var(--text-2); margin-bottom: 6px; }
-.kanban-card .row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
-.kanban-card .days-stuck { font-size: 11px; font-weight: 600; }
-.days-ok { color: var(--text-3); }
-.days-warn { color: var(--gold); }
-.days-danger { color: var(--danger); }
-
-/* Tabs (sub-navigation inside a view) */
-.subtabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
-.subtab {
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-2);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.subtab:hover { color: var(--text); }
-.subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-/* Tables */
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); border-bottom: 1px solid var(--border); font-weight: 600; }
-td { padding: 12px; border-bottom: 1px solid var(--border); }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: var(--surface-subtle); }
-
-/* Stat cards */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-.stat-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
-.stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); margin-bottom: 6px; }
-.stat-card .value { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--accent); }
-.stat-card .value.small { font-size: 20px; }
-
-.row-flex { display: flex; gap: 10px; align-items: center; }
-.flex-1 { flex: 1; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.text-muted { color: var(--text-3); }
-.mb-0 { margin-bottom: 0; }
-.section-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 17px;
-  margin: 28px 0 14px;
-}
-.section-title:first-child { margin-top: 0; }
-
-@media (max-width: 860px) {
-  .layout { flex-direction: column; }
-  .sidebar {
-    width: 100%;
-    height: auto;
-    max-height: 56px;
-    position: relative;
-    top: auto; left: auto; bottom: auto;
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
-    flex-shrink: 0;
-  }
-  .main { margin-left: 0; }
-  .sidebar-brand, .sidebar-footer { display: none; }
-  .nav { display: flex; padding: 0; height: 100%; }
-  .nav-item {
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    padding: 0 16px;
-    white-space: nowrap;
-    height: 100%;
-    display: flex;
-    align-items: center;
-  }
-  .nav-item.active { border-left-color: transparent; border-bottom-color: var(--gold); }
-  .content { padding: 18px 16px 40px; }
-  .topbar { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
-  .grid-2 { grid-template-columns: 1fr; }
-}
-
-/* Login screen */
-.login-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  background: linear-gradient(135deg, #2A3568 0%, #1f2854 100%);
-  padding: 20px;
-}
-.login-card {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 36px 32px;
-  width: 100%;
-  max-width: 360px;
-}
-.login-brand { text-align: center; margin-bottom: 26px; }
-.login-brand .name { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--accent); }
-.login-brand .sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-top: 4px; }
-.login-error {
-  background: var(--danger-light);
-  color: var(--danger);
-  font-size: 12.5px;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 14px;
-}
-</style>
-</head>
-<body>
-
-<div class="login-screen" id="login-screen">
-  <div class="login-card">
-    <div class="login-brand">
-      <div class="name">Syros</div>
-      <div class="sub">Painel Operacional</div>
-    </div>
-    <div class="field">
-      <label>Usuário</label>
-      <input id="login-user" placeholder="admin" autocomplete="username">
-    </div>
-    <div class="field">
-      <label>Senha</label>
-      <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <div id="login-error" class="login-error" style="display:none;"></div>
-    <button class="btn btn-primary" id="login-submit" style="width:100%; justify-content:center; padding:11px;">Entrar</button>
-  </div>
-</div>
-
-<div class="layout" id="app-layout" style="display:none;">
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <div class="name">Syros</div>
-      <div class="sub">Painel Operacional</div>
-    </div>
-    <nav class="nav" id="nav"></nav>
-    <div class="sidebar-footer" id="sidebar-footer">Syros Financial</div>
-  </aside>
-
-  <div class="main">
-    <header class="topbar">
-      <div>
-        <h1 id="page-title">Propostas</h1>
-        <div class="meta" id="page-meta"></div>
-      </div>
-      <div class="row-flex">
-        <div id="page-actions"></div>
-        <button class="btn btn-sm" id="btn-logout" title="Sair">Sair</button>
-      </div>
-    </header>
-    <main class="content" id="content"></main>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
 
 <script>
 
@@ -545,15 +337,6 @@ const PROPOSTA_STATUS = [
 ];
 
 async function renderPropostas() {
-  document.getElementById('page-meta').textContent = 'Funil de propostas — Discord → SEGFY → seguradora → cliente';
-  document.getElementById('page-actions').innerHTML = `
-    <div class="row-flex">
-      <button class="btn" id="btn-import-propostas">Importar lista do SEGFY</button>
-      <button class="btn btn-primary" id="btn-nova-proposta">+ Nova proposta</button>
-    </div>`;
-  document.getElementById('btn-import-propostas').onclick = openImportPropostasModal;
-  document.getElementById('btn-nova-proposta').onclick = () => openPropostaModal(null);
-
   const data = await sbCall(
     sb.from('corretora_propostas').select('*').order('created_at', { ascending: false }),
     'Não foi possível carregar as propostas.'
@@ -562,9 +345,9 @@ async function renderPropostas() {
 }
 
 function renderPropostasKanban(propostas) {
-  const content = document.getElementById('content');
+  const content = document.getElementById('propostas-content');
   if (propostas.length === 0) {
-    content.innerHTML = `<div class="empty-state"><div class="big">📋</div>Nenhuma proposta ainda. Importe a lista do SEGFY ou cadastre uma nova.</div>`;
+    content.innerHTML = `<div class="empty-state"><div class="icon">📋</div>Nenhuma proposta ainda. Importe a lista do SEGFY ou cadastre uma nova.</div>`;
     return;
   }
   const byStatus = {};
@@ -731,15 +514,6 @@ const PARCELA_STATUS = [
 ];
 
 async function renderParcelas() {
-  document.getElementById('page-meta').textContent = 'Controle de parcelas em atraso, até o envio do boleto';
-  document.getElementById('page-actions').innerHTML = `
-    <div class="row-flex">
-      <button class="btn" id="btn-import-parcelas">Importar lista</button>
-      <button class="btn btn-primary" id="btn-nova-parcela">+ Nova parcela</button>
-    </div>`;
-  document.getElementById('btn-import-parcelas').onclick = openImportParcelasModal;
-  document.getElementById('btn-nova-parcela').onclick = () => openParcelaModal(null);
-
   const data = await sbCall(
     sb.from('corretora_parcelas').select('*').order('created_at', { ascending: false }),
     'Não foi possível carregar as parcelas.'
@@ -748,9 +522,9 @@ async function renderParcelas() {
 }
 
 function renderParcelasKanban(parcelas) {
-  const content = document.getElementById('content');
+  const content = document.getElementById('parcelas-content');
   if (parcelas.length === 0) {
-    content.innerHTML = `<div class="empty-state"><div class="big">💳</div>Nenhuma parcela em atraso registrada.</div>`;
+    content.innerHTML = `<div class="empty-state"><div class="icon">💳</div>Nenhuma parcela em atraso registrada.</div>`;
     return;
   }
   const byStatus = {};
@@ -906,30 +680,17 @@ let sinistroTipos = [];
 let sinistrosSubview = 'kanban';
 
 async function renderSinistros() {
-  document.getElementById('page-meta').textContent = 'Abertura, acompanhamento e indicadores de sinistros';
-  document.getElementById('page-actions').innerHTML = `
-    <div class="row-flex">
-      <button class="btn" id="btn-tipos-sinistro">Tipos de sinistro</button>
-      <button class="btn btn-primary" id="btn-novo-sinistro">+ Novo sinistro</button>
-    </div>`;
-  document.getElementById('btn-novo-sinistro').onclick = () => openNovoSinistroModal();
-  document.getElementById('btn-tipos-sinistro').onclick = () => openTiposSinistroModal();
-
   sinistroTipos = await sbCall(sb.from('corretora_sinistro_tipos').select('*').eq('ativo', true), 'Erro ao carregar tipos.') || [];
-
-  const content = document.getElementById('content');
-  content.innerHTML = `
-    <div class="subtabs">
-      <div class="subtab ${sinistrosSubview === 'kanban' ? 'active' : ''}" data-sub="kanban">Acompanhamento</div>
-      <div class="subtab ${sinistrosSubview === 'dashboard' ? 'active' : ''}" data-sub="dashboard">Dashboard</div>
-    </div>
-    <div id="sinistros-subcontent"></div>
-  `;
-  content.querySelectorAll('.subtab').forEach(el => {
-    el.addEventListener('click', () => { sinistrosSubview = el.dataset.sub; renderSinistros(); });
-  });
-
   if (sinistrosSubview === 'kanban') loadSinistrosKanban();
+  else loadSinistrosDashboard();
+}
+
+function setSinistrosSubview(sub) {
+  sinistrosSubview = sub;
+  document.querySelectorAll('#view-sinistros .subtab').forEach(el => {
+    el.classList.toggle('active', el.dataset.sub === sub);
+  });
+  if (sub === 'kanban') loadSinistrosKanban();
   else loadSinistrosDashboard();
 }
 
@@ -946,9 +707,9 @@ async function loadSinistrosKanban() {
     sb.from('corretora_sinistros').select('*').neq('status_geral', 'cancelado').order('created_at', { ascending: false }),
     'Erro ao carregar sinistros.'
   ) || [];
-  const sub = document.getElementById('sinistros-subcontent');
+  const sub = document.getElementById('sinistros-content');
   if (data.length === 0) {
-    sub.innerHTML = `<div class="empty-state"><div class="big">🗂️</div>Nenhum sinistro em aberto. Clique em "+ Novo sinistro" para começar.</div>`;
+    sub.innerHTML = `<div class="empty-state"><div class="icon">🗂️</div>Nenhum sinistro em aberto. Clique em "+ Novo sinistro" para começar.</div>`;
     return;
   }
 
@@ -1278,9 +1039,9 @@ function openTiposSinistroModal() {
 // ---------- Dashboard ----------
 async function loadSinistrosDashboard() {
   const all = await sbCall(sb.from('corretora_sinistros').select('*'), 'Erro ao carregar dados.') || [];
-  const sub = document.getElementById('sinistros-subcontent');
+  const sub = document.getElementById('sinistros-content');
   if (all.length === 0) {
-    sub.innerHTML = `<div class="empty-state"><div class="big">📊</div>Sem dados suficientes ainda para o dashboard.</div>`;
+    sub.innerHTML = `<div class="empty-state"><div class="icon">📊</div>Sem dados suficientes ainda para o dashboard.</div>`;
     return;
   }
   const concluidos = all.filter(s => s.status_geral === 'concluido');
@@ -1375,32 +1136,19 @@ let assistenciaTipos = [];
 let assistenciasSubview = 'kanban';
 
 async function renderAssistencias() {
-  document.getElementById('page-meta').textContent = 'Abertura e acompanhamento de assistências';
-  document.getElementById('page-actions').innerHTML = `
-    <div class="row-flex">
-      <button class="btn" id="btn-tipos-assist">Tipos de assistência</button>
-      <button class="btn btn-primary" id="btn-nova-assist">+ Nova assistência</button>
-    </div>`;
-  document.getElementById('btn-nova-assist').onclick = () => openNovaAssistenciaModal();
-  document.getElementById('btn-tipos-assist').onclick = () => openTiposAssistenciaModal();
-
   assistenciaTipos = await sbCall(sb.from('corretora_assistencia_tipos').select('*').eq('ativo', true), 'Erro ao carregar tipos.') || [];
-
-  const content = document.getElementById('content');
-  content.innerHTML = `
-    <div class="subtabs">
-      <div class="subtab ${assistenciasSubview === 'kanban' ? 'active' : ''}" data-sub="kanban">Acompanhamento</div>
-      <div class="subtab ${assistenciasSubview === 'lembretes' ? 'active' : ''}" data-sub="lembretes">Lembretes de contato</div>
-      <div class="subtab ${assistenciasSubview === 'dashboard' ? 'active' : ''}" data-sub="dashboard">Dashboard</div>
-    </div>
-    <div id="assist-subcontent"></div>
-  `;
-  content.querySelectorAll('.subtab').forEach(el => {
-    el.addEventListener('click', () => { assistenciasSubview = el.dataset.sub; renderAssistencias(); });
-  });
-
   if (assistenciasSubview === 'kanban') loadAssistenciasKanban();
   else if (assistenciasSubview === 'lembretes') loadAssistenciasLembretes();
+  else loadAssistenciasDashboard();
+}
+
+function setAssistenciasSubview(sub) {
+  assistenciasSubview = sub;
+  document.querySelectorAll('#view-assistencias .subtab').forEach(el => {
+    el.classList.toggle('active', el.dataset.sub === sub);
+  });
+  if (sub === 'kanban') loadAssistenciasKanban();
+  else if (sub === 'lembretes') loadAssistenciasLembretes();
   else loadAssistenciasDashboard();
 }
 
@@ -1409,9 +1157,9 @@ async function loadAssistenciasKanban() {
     sb.from('corretora_assistencias').select('*').neq('status', 'cancelado').order('created_at', { ascending: false }),
     'Erro ao carregar assistências.'
   ) || [];
-  const sub = document.getElementById('assist-subcontent');
+  const sub = document.getElementById('assistencias-content');
   if (data.length === 0) {
-    sub.innerHTML = `<div class="empty-state"><div class="big">🛟</div>Nenhuma assistência registrada ainda.</div>`;
+    sub.innerHTML = `<div class="empty-state"><div class="icon">🛟</div>Nenhuma assistência registrada ainda.</div>`;
     return;
   }
   const byStatus = {};
@@ -1462,9 +1210,9 @@ async function loadAssistenciasLembretes() {
     sb.from('corretora_assistencias').select('*').eq('contato_realizado', false).not('data_lembrete_contato', 'is', null).order('data_lembrete_contato'),
     'Erro ao carregar lembretes.'
   ) || [];
-  const sub = document.getElementById('assist-subcontent');
+  const sub = document.getElementById('assistencias-content');
   if (data.length === 0) {
-    sub.innerHTML = `<div class="empty-state"><div class="big">✅</div>Nenhum lembrete de controle de qualidade pendente.</div>`;
+    sub.innerHTML = `<div class="empty-state"><div class="icon">✅</div>Nenhum lembrete de controle de qualidade pendente.</div>`;
     return;
   }
   sub.innerHTML = `
@@ -1495,9 +1243,9 @@ async function loadAssistenciasLembretes() {
 
 async function loadAssistenciasDashboard() {
   const all = await sbCall(sb.from('corretora_assistencias').select('*'), 'Erro ao carregar dados.') || [];
-  const sub = document.getElementById('assist-subcontent');
+  const sub = document.getElementById('assistencias-content');
   if (all.length === 0) {
-    sub.innerHTML = `<div class="empty-state"><div class="big">📊</div>Sem dados suficientes para o dashboard ainda.</div>`;
+    sub.innerHTML = `<div class="empty-state"><div class="icon">📊</div>Sem dados suficientes para o dashboard ainda.</div>`;
     return;
   }
   const finalizados = all.filter(a => a.status === 'finalizado' && a.data_abertura);
@@ -1713,7 +1461,6 @@ function openTiposAssistenciaModal() {
 // SYROS OPERACIONAL — Núcleo do app
 // ============================================================
 
-// Captura qualquer erro não tratado e mostra na tela (sem depender de DevTools/console)
 window.addEventListener('error', (e) => {
   showFatalError('Erro: ' + (e.message || 'falha desconhecida ao carregar o app.'));
 });
@@ -1725,20 +1472,11 @@ function showFatalError(msg) {
   if (!box) {
     box = document.createElement('div');
     box.id = 'fatal-error-box';
-    box.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#C0392B; color:#fff; padding:12px 16px; font-family:sans-serif; font-size:13px; z-index:9999; text-align:center;';
+    box.className = 'fatal-error-box';
     document.body.appendChild(box);
   }
   box.textContent = msg;
 }
-
-const VIEWS = [
-  { key: 'propostas', label: 'Propostas', icon: '01' },
-  { key: 'parcelas', label: 'Parcelas', icon: '02' },
-  { key: 'sinistros', label: 'Sinistros', icon: '03' },
-  { key: 'assistencias', label: 'Assistências', icon: '04' },
-];
-
-let currentView = 'propostas';
 
 // ---------- Helpers gerais ----------
 function fmtDate(d) {
@@ -1768,12 +1506,11 @@ function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-function uid() { return Math.random().toString(36).slice(2, 10); }
 
-function showToast(msg, isError = false) {
+function showToast(msg, type) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' danger' : '');
+  t.className = 'toast show' + (type ? ' ' + type : '');
   setTimeout(() => { t.className = 'toast'; }, 3200);
 }
 
@@ -1781,7 +1518,7 @@ async function sbCall(promise, errMsg) {
   const { data, error } = await promise;
   if (error) {
     console.error(error);
-    showToast(errMsg || ('Erro: ' + error.message), true);
+    showToast(errMsg || ('Erro: ' + error.message), 'error');
     return null;
   }
   return data;
@@ -1797,7 +1534,7 @@ function openModal(title, bodyHtml, footerHtml) {
     overlay.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <h2 id="modal-title"></h2>
+          <h2 class="modal-title" id="modal-title"></h2>
           <button class="modal-close" id="modal-close-btn">&times;</button>
         </div>
         <div class="modal-body" id="modal-body"></div>
@@ -1810,59 +1547,55 @@ function openModal(title, bodyHtml, footerHtml) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHtml;
   document.getElementById('modal-footer').innerHTML = footerHtml || '';
-  overlay.classList.add('show');
+  overlay.classList.add('open');
 }
 function closeModal() {
   const overlay = document.getElementById('modal-overlay');
-  if (overlay) overlay.classList.remove('show');
+  if (overlay) overlay.classList.remove('open');
 }
 
-// ---------- Navegação ----------
-function renderNav() {
-  const nav = document.getElementById('nav');
-  nav.innerHTML = VIEWS.map(v => `
-    <div class="nav-item ${v.key === currentView ? 'active' : ''}" data-view="${v.key}">
-      <span class="icon">${v.icon}</span><span>${v.label}</span>
-    </div>
-  `).join('');
-  nav.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', () => switchView(el.dataset.view));
-  });
-}
+// ---------- Navegação entre views ----------
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-item').forEach(n => n.classList.remove('active'));
 
-function switchView(viewKey) {
-  currentView = viewKey;
-  renderNav();
-  document.getElementById('page-actions').innerHTML = '';
-  const titles = { propostas: 'Propostas', parcelas: 'Parcelas', sinistros: 'Sinistros', assistencias: 'Assistências' };
-  document.getElementById('page-title').textContent = titles[viewKey];
-  const content = document.getElementById('content');
-  content.innerHTML = `<div class="empty-state"><span class="spinner"></span></div>`;
+  const viewEl = document.getElementById('view-' + id);
+  if (viewEl) viewEl.classList.add('active');
+  const navEl = document.getElementById('nav-' + id);
+  if (navEl) navEl.classList.add('active');
+  const mnavEl = document.getElementById('mnav-' + id);
+  if (mnavEl) mnavEl.classList.add('active');
 
-  if (viewKey === 'propostas') renderPropostas();
-  else if (viewKey === 'parcelas') renderParcelas();
-  else if (viewKey === 'sinistros') renderSinistros();
-  else if (viewKey === 'assistencias') renderAssistencias();
+  try {
+    const mainEl = document.querySelector('.main');
+    if (mainEl) mainEl.scrollTop = 0;
+    window.scrollTo(0, 0);
+  } catch (e) {}
+
+  if (id === 'propostas') renderPropostas();
+  else if (id === 'parcelas') renderParcelas();
+  else if (id === 'sinistros') renderSinistros();
+  else if (id === 'assistencias') renderAssistencias();
 }
 
 // ---------- Autenticação ----------
-// Login simples por usuário (mapeado para e-mail interno @syros.local)
 function usernameToEmail(username) {
   return username.trim().toLowerCase() + '@syros.local';
 }
 
-async function attemptLogin() {
+async function fazerLogin() {
   try {
-    const user = document.getElementById('login-user').value.trim();
-    const pass = document.getElementById('login-pass').value;
-    const errEl = document.getElementById('login-error');
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    const errEl = document.getElementById('loginErr');
     errEl.style.display = 'none';
     if (!user || !pass) {
       errEl.textContent = 'Preencha usuário e senha.';
       errEl.style.display = 'block';
       return;
     }
-    const btn = document.getElementById('login-submit');
+    const btn = document.getElementById('btnLogin');
     btn.disabled = true;
     btn.textContent = 'Entrando...';
 
@@ -1890,33 +1623,33 @@ async function attemptLogin() {
     showApp(data.user);
   } catch (err) {
     showFatalError('Erro ao entrar: ' + err.message);
-    const btn = document.getElementById('login-submit');
+    const btn = document.getElementById('btnLogin');
     if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
   }
 }
 
 function showApp(user) {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-layout').style.display = 'flex';
+  document.getElementById('authScreen').style.display = 'none';
+  const appEl = document.getElementById('appMain');
+  appEl.classList.add('visible');
   const username = (user.email || '').split('@')[0];
-  document.getElementById('sidebar-footer').textContent = `Conectado: ${username}`;
-  renderNav();
-  switchView('propostas');
+  document.getElementById('sidebarNome').textContent = username;
+  showView('propostas');
 }
 
 function showLogin() {
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app-layout').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('appMain').classList.remove('visible');
 }
 
-async function handleLogout() {
+async function fazerLogout() {
   await sb.auth.signOut();
   showLogin();
-  document.getElementById('login-user').value = '';
-  document.getElementById('login-pass').value = '';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
 }
 
-// Espera a biblioteca supabase (carregada dinamicamente, com fallback de CDN) ficar disponível
+// ---------- Espera a biblioteca supabase carregar (com fallback de CDN) ----------
 function waitForSupabaseLib(timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -1937,34 +1670,22 @@ function waitForSupabaseLib(timeoutMs = 8000) {
 // ---------- Boot ----------
 window.addEventListener('DOMContentLoaded', async () => {
   try {
-    // Se a URL tiver ?sinistro=TOKEN, abre a página pública do cliente — não exige login
     const params = new URLSearchParams(window.location.search);
     const trackToken = params.get('sinistro');
 
-    // Bind dos botões primeiro — garante que cliques funcionem mesmo se a checagem de sessão abaixo falhar
-    document.getElementById('login-submit').onclick = attemptLogin;
-    document.getElementById('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
-    document.getElementById('login-user').addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptLogin(); });
-    document.getElementById('btn-logout').onclick = handleLogout;
-
-    // Mostra que está carregando a conexão, em vez de deixar a tela parada sem feedback
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = 'Conectando...';
-    errEl.style.display = 'block';
-    errEl.style.background = '#E8EAF3';
-    errEl.style.color = '#1A2050';
+    document.getElementById('appLoading').style.display = 'none';
 
     try {
       await waitForSupabaseLib();
     } catch (libErr) {
       showFatalError('Não foi possível carregar a biblioteca de conexão (' + libErr.message + '). Verifique sua internet, troque de rede (Wi-Fi/dados) e recarregue a página.');
+      document.getElementById('authScreen').style.display = 'flex';
+      const errEl = document.getElementById('loginErr');
       errEl.textContent = 'Falha ao conectar. Recarregue a página ou troque de rede.';
-      errEl.style.background = '';
-      errEl.style.color = '';
+      errEl.style.display = 'block';
       return;
     }
 
-    // Cria o client agora que a lib está garantidamente disponível
     try {
       sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) {
@@ -1972,15 +1693,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    errEl.style.display = 'none';
-
     if (trackToken) {
-      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('authScreen').style.display = 'none';
       renderClientTracking(trackToken);
       return;
     }
 
-    // Verifica se já existe sessão ativa (evita pedir login de novo a cada refresh)
     try {
       const { data: { session } } = await sb.auth.getSession();
       if (session && session.user) {

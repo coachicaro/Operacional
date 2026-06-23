@@ -95,6 +95,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .subtab:hover{color:var(--text)}
 .subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
+/* PERIOD FILTER */
+.period-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px}
+.period-filter .pf-group{display:flex;gap:4px;background:var(--bg);border-radius:var(--radius-sm);padding:3px}
+.period-filter .pf-btn{padding:6px 12px;font-size:12.5px;font-weight:500;color:var(--text-2);background:transparent;border:none;border-radius:5px;cursor:pointer;transition:all .15s}
+.period-filter .pf-btn.active{background:var(--accent);color:#fff}
+.period-filter input[type="month"],.period-filter input[type="number"]{width:auto;padding:6px 10px;font-size:12.5px}
+.period-filter .pf-label{font-size:12px;color:var(--text-3);font-weight:500}
+
 /* GRID forms */
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .row-flex{display:flex;gap:10px;align-items:center}
@@ -199,7 +207,8 @@ tbody td{padding:11px 14px;vertical-align:middle}
       <div class="sub">Painel Operacional</div>
     </div>
     <nav class="sidebar-nav">
-      <div class="nav-item active" onclick="showView('propostas')" id="nav-propostas"><span class="icon">📄</span> Propostas</div>
+      <div class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="showView('propostas')" id="nav-propostas"><span class="icon">📄</span> Propostas</div>
       <div class="nav-item" onclick="showView('parcelas')" id="nav-parcelas"><span class="icon">💳</span> Parcelas</div>
       <div class="nav-item" onclick="showView('sinistros')" id="nav-sinistros"><span class="icon">🗂️</span> Sinistros</div>
       <div class="nav-item" onclick="showView('assistencias')" id="nav-assistencias"><span class="icon">🛟</span> Assistências</div>
@@ -212,7 +221,17 @@ tbody td{padding:11px 14px;vertical-align:middle}
 
   <main class="main">
 
-    <div class="view active" id="view-propostas">
+    <div class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <p class="page-sub">Visão geral do operacional</p>
+        </div>
+      </div>
+      <div id="dashboard-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
+    </div>
+
+    <div class="view" id="view-propostas">
       <div class="page-header">
         <div>
           <div class="page-title">Propostas</div>
@@ -222,6 +241,10 @@ tbody td{padding:11px 14px;vertical-align:middle}
           <button class="btn btn-ghost" onclick="openImportPropostasModal()">Importar lista do SEGFY</button>
           <button class="btn btn-primary" onclick="openPropostaModal(null)">+ Nova proposta</button>
         </div>
+      </div>
+      <div class="subtabs">
+        <div class="subtab active" data-sub="kanban" onclick="setPropostasSubview('kanban')">Funil</div>
+        <div class="subtab" data-sub="dashboard" onclick="setPropostasSubview('dashboard')">Dashboard</div>
       </div>
       <div id="propostas-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
     </div>
@@ -236,6 +259,10 @@ tbody td{padding:11px 14px;vertical-align:middle}
           <button class="btn btn-ghost" onclick="openImportParcelasModal()">Importar lista</button>
           <button class="btn btn-primary" onclick="openParcelaModal(null)">+ Nova parcela</button>
         </div>
+      </div>
+      <div class="subtabs">
+        <div class="subtab active" data-sub="kanban" onclick="setParcelasSubview('kanban')">Funil</div>
+        <div class="subtab" data-sub="dashboard" onclick="setParcelasSubview('dashboard')">Dashboard</div>
       </div>
       <div id="parcelas-content"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>
     </div>
@@ -281,7 +308,8 @@ tbody td{padding:11px 14px;vertical-align:middle}
 </div>
 
 <nav class="mobile-nav" id="mobileNav">
-  <button class="mobile-nav-item active" id="mnav-propostas" onclick="showView('propostas')"><span class="mn-icon">📄</span><span class="mn-label">Propostas</span></button>
+  <button class="mobile-nav-item active" id="mnav-dashboard" onclick="showView('dashboard')"><span class="mn-icon">📊</span><span class="mn-label">Dashboard</span></button>
+  <button class="mobile-nav-item" id="mnav-propostas" onclick="showView('propostas')"><span class="mn-icon">📄</span><span class="mn-label">Propostas</span></button>
   <button class="mobile-nav-item" id="mnav-parcelas" onclick="showView('parcelas')"><span class="mn-icon">💳</span><span class="mn-label">Parcelas</span></button>
   <button class="mobile-nav-item" id="mnav-sinistros" onclick="showView('sinistros')"><span class="mn-icon">🗂️</span><span class="mn-label">Sinistros</span></button>
   <button class="mobile-nav-item" id="mnav-assistencias" onclick="showView('assistencias')"><span class="mn-icon">🛟</span><span class="mn-label">Assistências</span></button>
@@ -321,6 +349,159 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let sb;
 
 
+// ==== dashboard.js ====
+// ============================================================
+// DASHBOARD GERAL + utilitário de filtro de período (reusado em Propostas/Parcelas)
+// ============================================================
+
+// ---------- Utilitário de período ----------
+// Retorna { inicio: 'YYYY-MM-DD', fim: 'YYYY-MM-DD', label: string }
+function periodoParaIntervalo(tipo, ref) {
+  const hoje = new Date();
+  let ano = ref && ref.ano ? ref.ano : hoje.getFullYear();
+
+  if (tipo === 'mes') {
+    const mes = ref && ref.mes ? ref.mes : (hoje.getMonth() + 1); // 1-12
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 0);
+    return { inicio: toISODate(inicio), fim: toISODate(fim), label: inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) };
+  }
+  if (tipo === 'trimestre') {
+    const tri = ref && ref.trimestre ? ref.trimestre : Math.floor(hoje.getMonth() / 3) + 1; // 1-4
+    const mesIni = (tri - 1) * 3;
+    const inicio = new Date(ano, mesIni, 1);
+    const fim = new Date(ano, mesIni + 3, 0);
+    return { inicio: toISODate(inicio), fim: toISODate(fim), label: `${tri}º trimestre de ${ano}` };
+  }
+  if (tipo === 'semestre') {
+    const sem = ref && ref.semestre ? ref.semestre : (hoje.getMonth() < 6 ? 1 : 2);
+    const mesIni = sem === 1 ? 0 : 6;
+    const inicio = new Date(ano, mesIni, 1);
+    const fim = new Date(ano, mesIni + 6, 0);
+    return { inicio: toISODate(inicio), fim: toISODate(fim), label: `${sem}º semestre de ${ano}` };
+  }
+  // anual
+  const inicio = new Date(ano, 0, 1);
+  const fim = new Date(ano, 11, 31);
+  return { inicio: toISODate(inicio), fim: toISODate(fim), label: `Ano ${ano}` };
+}
+function toISODate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+// Renderiza o HTML do seletor de período (mesmo componente em Propostas/Parcelas)
+function renderPeriodFilterHtml(prefix, estado) {
+  const anoAtual = new Date().getFullYear();
+  const anos = [anoAtual, anoAtual - 1, anoAtual - 2];
+  return `
+    <div class="period-filter">
+      <span class="pf-label">Período:</span>
+      <div class="pf-group">
+        <button class="pf-btn ${estado.tipo === 'mes' ? 'active' : ''}" onclick="setPeriodTipo('${prefix}','mes')">Mês</button>
+        <button class="pf-btn ${estado.tipo === 'trimestre' ? 'active' : ''}" onclick="setPeriodTipo('${prefix}','trimestre')">Trimestre</button>
+        <button class="pf-btn ${estado.tipo === 'semestre' ? 'active' : ''}" onclick="setPeriodTipo('${prefix}','semestre')">Semestre</button>
+        <button class="pf-btn ${estado.tipo === 'ano' ? 'active' : ''}" onclick="setPeriodTipo('${prefix}','ano')">Ano</button>
+      </div>
+      ${estado.tipo === 'mes' ? `<input type="month" id="${prefix}-pf-month" value="${estado.ano}-${String(estado.mes).padStart(2,'0')}" onchange="setPeriodMonth('${prefix}', this.value)">` : ''}
+      ${estado.tipo === 'trimestre' ? `
+        <select id="${prefix}-pf-tri" onchange="setPeriodSub('${prefix}','trimestre', this.value)">
+          ${[1,2,3,4].map(t => `<option value="${t}" ${estado.trimestre===t?'selected':''}>${t}º trimestre</option>`).join('')}
+        </select>
+        <input type="number" value="${estado.ano}" style="width:80px" onchange="setPeriodAno('${prefix}', this.value)">
+      ` : ''}
+      ${estado.tipo === 'semestre' ? `
+        <select id="${prefix}-pf-sem" onchange="setPeriodSub('${prefix}','semestre', this.value)">
+          ${[1,2].map(s => `<option value="${s}" ${estado.semestre===s?'selected':''}>${s}º semestre</option>`).join('')}
+        </select>
+        <input type="number" value="${estado.ano}" style="width:80px" onchange="setPeriodAno('${prefix}', this.value)">
+      ` : ''}
+      ${estado.tipo === 'ano' ? `<input type="number" value="${estado.ano}" style="width:80px" onchange="setPeriodAno('${prefix}', this.value)">` : ''}
+    </div>`;
+}
+
+// Estado global de período por módulo (propostas / parcelas)
+const periodoEstado = {
+  propostas: { tipo: 'mes', ano: new Date().getFullYear(), mes: new Date().getMonth() + 1, trimestre: Math.floor(new Date().getMonth()/3)+1, semestre: new Date().getMonth()<6?1:2 },
+  parcelas: { tipo: 'mes', ano: new Date().getFullYear(), mes: new Date().getMonth() + 1, trimestre: Math.floor(new Date().getMonth()/3)+1, semestre: new Date().getMonth()<6?1:2 },
+};
+
+function setPeriodTipo(prefix, tipo) {
+  periodoEstado[prefix].tipo = tipo;
+  if (prefix === 'propostas') loadPropostasDashboard();
+  else loadParcelasDashboard();
+}
+function setPeriodMonth(prefix, value) {
+  const [ano, mes] = value.split('-').map(Number);
+  periodoEstado[prefix].ano = ano;
+  periodoEstado[prefix].mes = mes;
+  if (prefix === 'propostas') loadPropostasDashboard();
+  else loadParcelasDashboard();
+}
+function setPeriodSub(prefix, campo, value) {
+  periodoEstado[prefix][campo] = Number(value);
+  if (prefix === 'propostas') loadPropostasDashboard();
+  else loadParcelasDashboard();
+}
+function setPeriodAno(prefix, value) {
+  periodoEstado[prefix].ano = Number(value);
+  if (prefix === 'propostas') loadPropostasDashboard();
+  else loadParcelasDashboard();
+}
+
+// ---------- Dashboard geral (KPIs consolidados) ----------
+async function renderDashboardGeral() {
+  const el = document.getElementById('dashboard-content');
+
+  const [propostas, parcelas, sinistros, assistencias] = await Promise.all([
+    sbCall(sb.from('corretora_propostas').select('*'), 'Erro ao carregar propostas.') ,
+    sbCall(sb.from('corretora_parcelas').select('*'), 'Erro ao carregar parcelas.'),
+    sbCall(sb.from('corretora_sinistros').select('*'), 'Erro ao carregar sinistros.'),
+    sbCall(sb.from('corretora_assistencias').select('*'), 'Erro ao carregar assistências.'),
+  ]);
+  const P = propostas || [], PA = parcelas || [], S = sinistros || [], A = assistencias || [];
+
+  const propostasAbertas = P.filter(p => !['concluido','cancelada'].includes(p.status)).length;
+  const propostasPendentes = P.filter(p => p.status === 'pendente_seguradora').length;
+  const parcelasRisco = PA.filter(p => p.status === 'risco_cancelamento').length;
+  const parcelasAtrasadas = PA.filter(p => !['cliente_avisado','cancelada_falta_pagamento'].includes(p.status)).length;
+  const sinistrosAbertos = S.filter(s => s.status_geral === 'em_andamento').length;
+  const sinistrosIndenizados = S.filter(s => s.status_geral === 'concluido').reduce((sum, s) => sum + (Number(s.valor_final) || 0), 0);
+  const assistAbertas = A.filter(a => !['finalizado','cancelado'].includes(a.status)).length;
+  const assistNotas = A.filter(a => a.satisfacao_nota).map(a => a.satisfacao_nota);
+  const satisfacaoMedia = assistNotas.length ? (assistNotas.reduce((a,b)=>a+b,0)/assistNotas.length).toFixed(1) : '—';
+
+  el.innerHTML = `
+    <div class="section-title">Propostas</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Em andamento</div><div class="value">${propostasAbertas}</div></div>
+      <div class="stat-card"><div class="label">Pendentes</div><div class="value">${propostasPendentes}</div></div>
+      <div class="stat-card"><div class="label">Total no sistema</div><div class="value">${P.length}</div></div>
+    </div>
+
+    <div class="section-title">Parcelas</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Em atraso (ativas)</div><div class="value">${parcelasAtrasadas}</div></div>
+      <div class="stat-card"><div class="label">Risco de cancelamento</div><div class="value">${parcelasRisco}</div></div>
+      <div class="stat-card"><div class="label">Total no sistema</div><div class="value">${PA.length}</div></div>
+    </div>
+
+    <div class="section-title">Sinistros</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Em andamento</div><div class="value">${sinistrosAbertos}</div></div>
+      <div class="stat-card"><div class="label">Total indenizado</div><div class="value small">${fmtMoney(sinistrosIndenizados)}</div></div>
+      <div class="stat-card"><div class="label">Total no sistema</div><div class="value">${S.length}</div></div>
+    </div>
+
+    <div class="section-title">Assistências</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Em andamento</div><div class="value">${assistAbertas}</div></div>
+      <div class="stat-card"><div class="label">Satisfação média</div><div class="value small">★ ${satisfacaoMedia}</div></div>
+      <div class="stat-card"><div class="label">Total no sistema</div><div class="value">${A.length}</div></div>
+    </div>
+  `;
+}
+
+
 // ==== propostas.js ====
 // ============================================================
 // PROPOSTAS
@@ -330,13 +511,32 @@ const PROPOSTA_STATUS = [
   { key: 'recebido', label: 'PDF recebido' },
   { key: 'importado_segfy', label: 'Importado no SEGFY' },
   { key: 'comissao_lancada', label: 'Comissão lançada' },
-  { key: 'pendente_seguradora', label: 'Pendente seguradora' },
+  { key: 'pendente_seguradora', label: 'Pendente' },
   { key: 'apolice_ok', label: 'Apólice/boleto OK' },
   { key: 'enviado_cliente', label: 'Enviado ao cliente' },
   { key: 'concluido', label: 'Concluído' },
+  { key: 'cancelada', label: 'Cancelada' },
 ];
 
+let propostasSubview = 'kanban';
+let motivosCancelamento = [];
+let motivosPendencia = [];
+
 async function renderPropostas() {
+  if (propostasSubview === 'kanban') loadPropostasKanban();
+  else loadPropostasDashboard();
+}
+
+function setPropostasSubview(sub) {
+  propostasSubview = sub;
+  document.querySelectorAll('#view-propostas .subtab').forEach(el => {
+    el.classList.toggle('active', el.dataset.sub === sub);
+  });
+  if (sub === 'kanban') loadPropostasKanban();
+  else loadPropostasDashboard();
+}
+
+async function loadPropostasKanban() {
   const data = await sbCall(
     sb.from('corretora_propostas').select('*').order('created_at', { ascending: false }),
     'Não foi possível carregar as propostas.'
@@ -397,10 +597,22 @@ function renderPropostaCard(p) {
     </div>`;
 }
 
-function openPropostaModal(p) {
+async function carregarMotivos() {
+  if (motivosCancelamento.length === 0) {
+    motivosCancelamento = await sbCall(sb.from('corretora_motivo_cancelamento').select('*').eq('ativo', true), 'Erro ao carregar motivos.') || [];
+  }
+  if (motivosPendencia.length === 0) {
+    motivosPendencia = await sbCall(sb.from('corretora_motivo_pendencia').select('*').eq('ativo', true), 'Erro ao carregar motivos.') || [];
+  }
+}
+
+async function openPropostaModal(p) {
+  await carregarMotivos();
   const isNew = !p;
   p = p || { status: 'recebido' };
   const statusOptions = PROPOSTA_STATUS.map(s => `<option value="${s.key}" ${p.status === s.key ? 'selected' : ''}>${s.label}</option>`).join('');
+  const motivoCancOptions = '<option value="">— selecione —</option>' + motivosCancelamento.map(m => `<option value="${m.id}" ${p.motivo_cancelamento_id === m.id ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('');
+  const motivoPendOptions = '<option value="">— selecione —</option>' + motivosPendencia.map(m => `<option value="${m.id}" ${p.motivo_pendencia_id === m.id ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('');
 
   const body = `
     <div class="field"><label>Cliente</label><input id="f-cliente" value="${escapeHtml(p.cliente_nome || '')}" placeholder="Nome do cliente"></div>
@@ -413,10 +625,29 @@ function openPropostaModal(p) {
       <div class="field"><label>Comissão (R$)</label><input id="f-comissao" type="number" step="0.01" value="${p.comissao_valor ?? ''}"></div>
     </div>
     <div class="grid-2">
-      <div class="field"><label>Status</label><select id="f-status">${statusOptions}</select></div>
+      <div class="field"><label>Status</label><select id="f-status" onchange="togglePropostaCamposCondicionais()">${statusOptions}</select></div>
       <div class="field"><label>Responsável</label><input id="f-responsavel" value="${escapeHtml(p.responsavel || '')}"></div>
     </div>
-    <div class="field"><label>Pendente desde (se aplicável)</label><input id="f-pendencia" type="date" value="${p.data_pendencia || ''}"></div>
+
+    <div id="campo-pendencia" style="display:${p.status === 'pendente_seguradora' ? 'block' : 'none'}">
+      <div class="grid-2">
+        <div class="field"><label>Pendente desde</label><input id="f-pendencia" type="date" value="${p.data_pendencia || ''}"></div>
+        <div class="field"><label>Motivo da pendência</label><select id="f-motivo-pendencia">${motivoPendOptions}</select></div>
+      </div>
+    </div>
+
+    <div id="campo-emissao" style="display:${p.status === 'apolice_ok' || p.status === 'enviado_cliente' || p.status === 'concluido' ? 'block' : 'none'}">
+      <div class="field"><label>Data de emissão da apólice</label><input id="f-emissao" type="date" value="${p.data_emissao || ''}"></div>
+    </div>
+
+    <div id="campo-cancelamento" style="display:${p.status === 'cancelada' ? 'block' : 'none'}">
+      <div class="grid-2">
+        <div class="field"><label>Motivo do cancelamento</label><select id="f-motivo-cancelamento">${motivoCancOptions}</select></div>
+        <div class="field"><label>Observação</label><input id="f-motivo-cancelamento-obs" value="${escapeHtml(p.motivo_cancelamento_obs || '')}"></div>
+      </div>
+    </div>
+
+    <div class="field"><label>Data de entrada no funil</label><input id="f-criacao" type="date" value="${p.data_criacao_funil || new Date().toISOString().slice(0,10)}"></div>
     <div class="field"><label>Observações</label><textarea id="f-obs" rows="3">${escapeHtml(p.observacoes || '')}</textarea></div>
   `;
   const footer = `
@@ -436,30 +667,80 @@ function openPropostaModal(p) {
     renderPropostas();
   };
   document.getElementById('btn-save-proposta').onclick = async () => {
+    const status = document.getElementById('f-status').value;
     const payload = {
       cliente_nome: document.getElementById('f-cliente').value.trim(),
       seguradora: document.getElementById('f-seguradora').value.trim() || null,
       numero_proposta: document.getElementById('f-numero').value.trim() || null,
       ramo: document.getElementById('f-ramo').value.trim() || null,
       comissao_valor: document.getElementById('f-comissao').value || null,
-      status: document.getElementById('f-status').value,
+      status,
       responsavel: document.getElementById('f-responsavel').value.trim() || null,
-      data_pendencia: document.getElementById('f-pendencia').value || null,
+      data_criacao_funil: document.getElementById('f-criacao').value || null,
       observacoes: document.getElementById('f-obs').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    if (!payload.cliente_nome) { showToast('Informe o nome do cliente.', true); return; }
+    if (!payload.cliente_nome) { showToast('Informe o nome do cliente.', 'error'); return; }
+
+    const elPendencia = document.getElementById('f-pendencia');
+    const elMotivoPendencia = document.getElementById('f-motivo-pendencia');
+    if (elPendencia) payload.data_pendencia = elPendencia.value || null;
+    if (elMotivoPendencia) payload.motivo_pendencia_id = elMotivoPendencia.value || null;
+
+    const elEmissao = document.getElementById('f-emissao');
+    if (elEmissao) payload.data_emissao = elEmissao.value || null;
+
+    const elMotivoCanc = document.getElementById('f-motivo-cancelamento');
+    const elMotivoCancObs = document.getElementById('f-motivo-cancelamento-obs');
+    if (elMotivoCanc) payload.motivo_cancelamento_id = elMotivoCanc.value || null;
+    if (elMotivoCancObs) payload.motivo_cancelamento_obs = elMotivoCancObs.value.trim() || null;
+
+    if (status === 'cancelada' && !payload.motivo_cancelamento_id) {
+      showToast('Selecione o motivo do cancelamento.', 'error');
+      return;
+    }
 
     if (isNew) {
-      await sbCall(sb.from('corretora_propostas').insert(payload), 'Erro ao criar proposta.');
-      showToast('Proposta criada.');
+      const novaProposta = await sbCall(sb.from('corretora_propostas').insert(payload).select().single(), 'Erro ao criar proposta.');
+      if (novaProposta && window.__reposicaoParcelaId) {
+        await sbCall(sb.from('corretora_propostas').update({ reposicao_de_parcela_id: window.__reposicaoParcelaId }).eq('id', novaProposta.id), 'Erro ao vincular reposição.');
+        window.__reposicaoParcelaId = null;
+      }
+      showToast('Proposta criada.', 'success');
     } else {
       await sbCall(sb.from('corretora_propostas').update(payload).eq('id', p.id), 'Erro ao salvar.');
-      showToast('Proposta atualizada.');
+      showToast('Proposta atualizada.', 'success');
     }
     closeModal();
     renderPropostas();
   };
+}
+
+function togglePropostaCamposCondicionais() {
+  const status = document.getElementById('f-status').value;
+  const pend = document.getElementById('campo-pendencia');
+  const emissao = document.getElementById('campo-emissao');
+  const canc = document.getElementById('campo-cancelamento');
+  if (pend) pend.style.display = status === 'pendente_seguradora' ? 'block' : 'none';
+  if (emissao) emissao.style.display = ['apolice_ok','enviado_cliente','concluido'].includes(status) ? 'block' : 'none';
+  if (canc) canc.style.display = status === 'cancelada' ? 'block' : 'none';
+}
+
+// Abre uma nova proposta já marcada como "reposição" de uma parcela cancelada (retrabalho)
+function abrirPropostaReposicao(parcelaId) {
+  window.__reposicaoParcelaId = parcelaId;
+  openPropostaModal(null);
+  setTimeout(() => {
+    const modalBody = document.getElementById('modal-body');
+    if (modalBody) {
+      const hint = document.createElement('div');
+      hint.className = 'chip chip-gold';
+      hint.style.marginBottom = '10px';
+      hint.style.display = 'inline-block';
+      hint.textContent = 'Esta proposta será marcada como reposição (retrabalho)';
+      modalBody.prepend(hint);
+    }
+  }, 50);
 }
 
 function openImportPropostasModal() {
@@ -490,13 +771,85 @@ Maria Souza; Allianz; 98765"></textarea>
         numero_proposta: parts[2] || null,
         status,
         data_pendencia: status === 'pendente_seguradora' ? new Date().toISOString().slice(0,10) : null,
+        data_criacao_funil: new Date().toISOString().slice(0,10),
       };
     });
     await sbCall(sb.from('corretora_propostas').insert(rows), 'Erro ao importar.');
-    showToast(`${rows.length} proposta(s) importada(s).`);
+    showToast(`${rows.length} proposta(s) importada(s).`, 'success');
     closeModal();
     renderPropostas();
   };
+}
+
+// ---------- Dashboard de Propostas ----------
+async function loadPropostasDashboard() {
+  await carregarMotivos();
+  const el = document.getElementById('propostas-content');
+  const estado = periodoEstado.propostas;
+  const { inicio, fim, label } = periodoParaIntervalo(estado.tipo, estado);
+
+  el.innerHTML = renderPeriodFilterHtml('propostas', estado) + `<div id="propostas-dash-body"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>`;
+
+  const data = await sbCall(
+    sb.from('corretora_propostas').select('*').gte('data_criacao_funil', inicio).lte('data_criacao_funil', fim),
+    'Erro ao carregar dashboard.'
+  ) || [];
+
+  const body = document.getElementById('propostas-dash-body');
+  const total = data.length;
+  const importadas = data.filter(p => p.status !== 'recebido').length;
+  const apolicesEmitidas = data.filter(p => p.data_emissao).length;
+  const canceladas = data.filter(p => p.status === 'cancelada');
+  const refeitas = data.filter(p => p.reposicao_de_parcela_id).length;
+  const pendentes = data.filter(p => p.motivo_pendencia_id || p.status === 'pendente_seguradora');
+
+  const comEmissao = data.filter(p => p.data_emissao && p.data_criacao_funil);
+  const tempoMedioEmissao = comEmissao.length
+    ? Math.round(comEmissao.reduce((sum, p) => sum + (new Date(p.data_emissao) - new Date(p.data_criacao_funil)) / 86400000, 0) / comEmissao.length * 10) / 10
+    : null;
+
+  const motivosCancContagem = {};
+  canceladas.forEach(p => {
+    const m = motivosCancelamento.find(x => x.id === p.motivo_cancelamento_id);
+    const lbl = m ? m.label : 'Não informado';
+    motivosCancContagem[lbl] = (motivosCancContagem[lbl] || 0) + 1;
+  });
+  const motivosPendContagem = {};
+  pendentes.forEach(p => {
+    const m = motivosPendencia.find(x => x.id === p.motivo_pendencia_id);
+    const lbl = m ? m.label : 'Não informado';
+    motivosPendContagem[lbl] = (motivosPendContagem[lbl] || 0) + 1;
+  });
+
+  body.innerHTML = `
+    <p class="text-muted" style="margin-bottom:16px;font-size:13px;">Período: <strong>${label}</strong> (${fmtDate(inicio)} a ${fmtDate(fim)})</p>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Propostas no período</div><div class="value">${total}</div></div>
+      <div class="stat-card"><div class="label">Importadas no SEGFY</div><div class="value">${importadas}</div></div>
+      <div class="stat-card"><div class="label">Apólices emitidas</div><div class="value">${apolicesEmitidas}</div></div>
+      <div class="stat-card"><div class="label">Tempo médio de emissão</div><div class="value small">${tempoMedioEmissao !== null ? tempoMedioEmissao + ' dias' : '—'}</div></div>
+      <div class="stat-card"><div class="label">Canceladas</div><div class="value">${canceladas.length}</div></div>
+      <div class="stat-card"><div class="label">Refeitas (retrabalho)</div><div class="value">${refeitas}</div></div>
+      <div class="stat-card"><div class="label">Com pendência</div><div class="value">${pendentes.length}</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <div class="section-title">Motivos de cancelamento</div>
+        <div class="card card-pad">
+          <table><thead><tr><th>Motivo</th><th>Qtd.</th></tr></thead>
+          <tbody>${Object.entries(motivosCancContagem).sort((a,b)=>b[1]-a[1]).map(([m,c]) => `<tr><td>${escapeHtml(m)}</td><td>${c}</td></tr>`).join('') || '<tr><td colspan="2" class="text-muted">Nenhuma cancelada no período.</td></tr>'}</tbody></table>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">Motivos de pendência</div>
+        <div class="card card-pad">
+          <table><thead><tr><th>Motivo</th><th>Qtd.</th></tr></thead>
+          <tbody>${Object.entries(motivosPendContagem).sort((a,b)=>b[1]-a[1]).map(([m,c]) => `<tr><td>${escapeHtml(m)}</td><td>${c}</td></tr>`).join('') || '<tr><td colspan="2" class="text-muted">Nenhuma pendência no período.</td></tr>'}</tbody></table>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 
@@ -511,9 +864,34 @@ const PARCELA_STATUS = [
   { key: 'enviado_whatsapp', label: 'Enviado (WhatsApp)' },
   { key: 'risco_cancelamento', label: 'Risco de cancelamento' },
   { key: 'cliente_avisado', label: 'Cliente avisado' },
+  { key: 'cancelada_falta_pagamento', label: 'Cancelada' },
 ];
 
+const FORMA_PAGAMENTO = [
+  { key: 'boleto', label: 'Boleto' },
+  { key: 'cartao', label: 'Cartão' },
+  { key: 'debito_automatico', label: 'Débito automático' },
+  { key: 'pix', label: 'Pix' },
+  { key: 'outro', label: 'Outro' },
+];
+
+let parcelasSubview = 'kanban';
+
 async function renderParcelas() {
+  if (parcelasSubview === 'kanban') loadParcelasKanban();
+  else loadParcelasDashboard();
+}
+
+function setParcelasSubview(sub) {
+  parcelasSubview = sub;
+  document.querySelectorAll('#view-parcelas .subtab').forEach(el => {
+    el.classList.toggle('active', el.dataset.sub === sub);
+  });
+  if (sub === 'kanban') loadParcelasKanban();
+  else loadParcelasDashboard();
+}
+
+async function loadParcelasKanban() {
   const data = await sbCall(
     sb.from('corretora_parcelas').select('*').order('created_at', { ascending: false }),
     'Não foi possível carregar as parcelas.'
@@ -560,12 +938,14 @@ function renderParcelaCard(p) {
     const days = daysSince(p.data_vencimento);
     if (days > 0) vencInfo = `<span class="days-stuck ${days >= 15 ? 'days-danger' : 'days-warn'}">${days}d em atraso</span>`;
   }
+  const fp = FORMA_PAGAMENTO.find(f => f.key === p.forma_pagamento);
   return `
     <div class="kanban-card ${urgentClass}" data-id="${p.id}">
       <div class="title">${escapeHtml(p.cliente_nome)}</div>
       <div class="sub">${escapeHtml(p.seguradora || '—')} ${p.numero_parcela ? '· parc. ' + escapeHtml(p.numero_parcela) : ''}</div>
       <div class="row">
         <span class="chip">${fmtMoney(p.valor)}</span>
+        ${fp ? `<span class="chip">${fp.label}</span>` : ''}
         ${vencInfo}
       </div>
     </div>`;
@@ -575,6 +955,7 @@ function openParcelaModal(p) {
   const isNew = !p;
   p = p || { status: 'atraso_identificado' };
   const statusOptions = PARCELA_STATUS.map(s => `<option value="${s.key}" ${p.status === s.key ? 'selected' : ''}>${s.label}</option>`).join('');
+  const formaPagOptions = '<option value="">— selecione —</option>' + FORMA_PAGAMENTO.map(f => `<option value="${f.key}" ${p.forma_pagamento === f.key ? 'selected' : ''}>${f.label}</option>`).join('');
 
   const body = `
     <div class="field"><label>Cliente</label><input id="f-cliente" value="${escapeHtml(p.cliente_nome || '')}"></div>
@@ -588,9 +969,16 @@ function openParcelaModal(p) {
     </div>
     <div class="grid-2">
       <div class="field"><label>Status</label><select id="f-status">${statusOptions}</select></div>
-      <div class="field"><label>Responsável</label><input id="f-responsavel" value="${escapeHtml(p.responsavel || '')}"></div>
+      <div class="field"><label>Forma de pagamento</label><select id="f-forma-pagamento">${formaPagOptions}</select></div>
     </div>
+    <div class="field"><label>Responsável</label><input id="f-responsavel" value="${escapeHtml(p.responsavel || '')}"></div>
     <div class="field"><label>Observações</label><textarea id="f-obs" rows="3">${escapeHtml(p.observacoes || '')}</textarea></div>
+
+    ${!isNew && p.status === 'cancelada_falta_pagamento' ? `
+      <div class="field" style="background:var(--accent-light);padding:10px 12px;border-radius:var(--radius-sm);">
+        <button class="btn btn-ghost btn-sm" id="btn-criar-reposicao" type="button">+ Criar proposta de reposição (retrabalho)</button>
+      </div>
+    ` : ''}
   `;
   const footer = `
     ${!isNew ? '<button class="btn btn-danger" id="btn-del-parcela">Excluir</button>' : ''}
@@ -608,6 +996,13 @@ function openParcelaModal(p) {
     showToast('Registro excluído.');
     renderParcelas();
   };
+
+  const btnReposicao = document.getElementById('btn-criar-reposicao');
+  if (btnReposicao) btnReposicao.onclick = () => {
+    closeModal();
+    abrirPropostaReposicao(p.id);
+  };
+
   document.getElementById('btn-save-parcela').onclick = async () => {
     const payload = {
       cliente_nome: document.getElementById('f-cliente').value.trim(),
@@ -616,18 +1011,19 @@ function openParcelaModal(p) {
       valor: document.getElementById('f-valor').value || null,
       data_vencimento: document.getElementById('f-vencimento').value || null,
       status: document.getElementById('f-status').value,
+      forma_pagamento: document.getElementById('f-forma-pagamento').value || null,
       responsavel: document.getElementById('f-responsavel').value.trim() || null,
       observacoes: document.getElementById('f-obs').value.trim() || null,
       updated_at: new Date().toISOString(),
     };
-    if (!payload.cliente_nome) { showToast('Informe o nome do cliente.', true); return; }
+    if (!payload.cliente_nome) { showToast('Informe o nome do cliente.', 'error'); return; }
 
     if (isNew) {
       await sbCall(sb.from('corretora_parcelas').insert(payload), 'Erro ao criar.');
-      showToast('Parcela registrada.');
+      showToast('Parcela registrada.', 'success');
     } else {
       await sbCall(sb.from('corretora_parcelas').update(payload).eq('id', p.id), 'Erro ao salvar.');
-      showToast('Parcela atualizada.');
+      showToast('Parcela atualizada.', 'success');
     }
     closeModal();
     renderParcelas();
@@ -637,10 +1033,10 @@ function openParcelaModal(p) {
 function openImportParcelasModal() {
   const body = `
     <p class="text-muted" style="margin-top:0;">Cole a lista de parcelas em atraso (uma por linha), separada por <strong>ponto e vírgula</strong>:</p>
-    <p class="text-muted" style="font-size:12px;">cliente; seguradora; nº parcela; valor; vencimento (AAAA-MM-DD)</p>
+    <p class="text-muted" style="font-size:12px;">cliente; seguradora; nº parcela; valor; vencimento (AAAA-MM-DD); forma de pagamento (boleto/cartao/debito_automatico/pix/outro)</p>
     <div class="field">
-      <textarea id="import-text" rows="10" placeholder="João Silva; Porto Seguro; 3; 250.00; 2026-06-10
-Maria Souza; Allianz; 5; 180.50; 2026-06-05"></textarea>
+      <textarea id="import-text" rows="10" placeholder="João Silva; Porto Seguro; 3; 250.00; 2026-06-10; boleto
+Maria Souza; Allianz; 5; 180.50; 2026-06-05; pix"></textarea>
     </div>
   `;
   const footer = `
@@ -652,22 +1048,103 @@ Maria Souza; Allianz; 5; 180.50; 2026-06-05"></textarea>
   document.getElementById('btn-do-import').onclick = async () => {
     const raw = document.getElementById('import-text').value.trim();
     if (!raw) { closeModal(); return; }
+    const formasValidas = FORMA_PAGAMENTO.map(f => f.key);
     const rows = raw.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
       const parts = line.split(';').map(p => p.trim());
+      const forma = parts[5] && formasValidas.includes(parts[5]) ? parts[5] : null;
       return {
         cliente_nome: parts[0] || 'Sem nome',
         seguradora: parts[1] || null,
         numero_parcela: parts[2] || null,
         valor: parts[3] ? parseFloat(parts[3].replace(',', '.')) : null,
         data_vencimento: parts[4] || null,
+        forma_pagamento: forma,
         status: 'atraso_identificado',
       };
     });
     await sbCall(sb.from('corretora_parcelas').insert(rows), 'Erro ao importar.');
-    showToast(`${rows.length} parcela(s) importada(s).`);
+    showToast(`${rows.length} parcela(s) importada(s).`, 'success');
     closeModal();
     renderParcelas();
   };
+}
+
+// ---------- Dashboard de Parcelas ----------
+async function loadParcelasDashboard() {
+  const el = document.getElementById('parcelas-content');
+  const estado = periodoEstado.parcelas;
+  const { inicio, fim, label } = periodoParaIntervalo(estado.tipo, estado);
+
+  el.innerHTML = renderPeriodFilterHtml('parcelas', estado) + `<div id="parcelas-dash-body"><div class="empty-state"><span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:2px;"></span></div></div>`;
+
+  const data = await sbCall(
+    sb.from('corretora_parcelas').select('*').gte('data_vencimento', inicio).lte('data_vencimento', fim),
+    'Erro ao carregar dashboard.'
+  ) || [];
+
+  const idsParcelas = data.map(p => p.id);
+  const reposicoes = idsParcelas.length
+    ? await sbCall(sb.from('corretora_propostas').select('reposicao_de_parcela_id').in('reposicao_de_parcela_id', idsParcelas), 'Erro ao carregar retrabalho.') || []
+    : [];
+  const reposicaoPorParcela = {};
+  reposicoes.forEach(r => { reposicaoPorParcela[r.reposicao_de_parcela_id] = true; });
+
+  const body = document.getElementById('parcelas-dash-body');
+  const total = data.length;
+  const atrasadasOuVencidas = data.filter(p => !['cliente_avisado','cancelada_falta_pagamento'].includes(p.status) || (p.data_vencimento && daysSince(p.data_vencimento) > 0));
+  const pctAtraso = total ? Math.round(atrasadasOuVencidas.length / total * 100) : 0;
+  const canceladas = data.filter(p => p.status === 'cancelada_falta_pagamento');
+
+  const porForma = {};
+  FORMA_PAGAMENTO.forEach(f => { porForma[f.key] = { total: 0, atrasadas: 0, canceladas: 0, retrabalho: 0 }; });
+  data.forEach(p => {
+    const key = p.forma_pagamento || 'outro';
+    if (!porForma[key]) porForma[key] = { total: 0, atrasadas: 0, canceladas: 0, retrabalho: 0 };
+    porForma[key].total++;
+    if (atrasadasOuVencidas.includes(p)) porForma[key].atrasadas++;
+    if (p.status === 'cancelada_falta_pagamento') porForma[key].canceladas++;
+    if (reposicaoPorParcela[p.id]) porForma[key].retrabalho++;
+  });
+
+  function maiorPor(campo) {
+    let melhor = null;
+    Object.entries(porForma).forEach(([key, v]) => {
+      if (v.total === 0) return;
+      if (!melhor || v[campo] > melhor.valor) melhor = { key, valor: v[campo] };
+    });
+    if (!melhor || melhor.valor === 0) return '—';
+    const f = FORMA_PAGAMENTO.find(x => x.key === melhor.key);
+    return `${f ? f.label : melhor.key} (${melhor.valor})`;
+  }
+
+  body.innerHTML = `
+    <p class="text-muted" style="margin-bottom:16px;font-size:13px;">Período: <strong>${label}</strong> (${fmtDate(inicio)} a ${fmtDate(fim)}) — baseado na data de vencimento</p>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Parcelas no período</div><div class="value">${total}</div></div>
+      <div class="stat-card"><div class="label">Atrasadas/vencidas</div><div class="value">${atrasadasOuVencidas.length}</div></div>
+      <div class="stat-card"><div class="label">% do total em atraso</div><div class="value">${pctAtraso}%</div></div>
+      <div class="stat-card"><div class="label">Canceladas (falta pgto)</div><div class="value">${canceladas.length}</div></div>
+      <div class="stat-card"><div class="label">Forma que mais atrasa</div><div class="value small">${maiorPor('atrasadas')}</div></div>
+      <div class="stat-card"><div class="label">Forma que mais cancela</div><div class="value small">${maiorPor('canceladas')}</div></div>
+      <div class="stat-card"><div class="label">Forma com mais retrabalho</div><div class="value small">${maiorPor('retrabalho')}</div></div>
+    </div>
+
+    <div class="section-title">Detalhe por forma de pagamento</div>
+    <div class="card card-pad">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Forma</th><th>Total</th><th>Atrasadas</th><th>Canceladas</th><th>Retrabalho</th></tr></thead>
+          <tbody>
+            ${FORMA_PAGAMENTO.map(f => {
+              const v = porForma[f.key];
+              if (!v || v.total === 0) return '';
+              return `<tr><td>${f.label}</td><td>${v.total}</td><td>${v.atrasadas}</td><td>${v.canceladas}</td><td>${v.retrabalho}</td></tr>`;
+            }).join('') || '<tr><td colspan="5" class="text-muted">Sem dados no período.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
 
@@ -1573,7 +2050,8 @@ function showView(id) {
     window.scrollTo(0, 0);
   } catch (e) {}
 
-  if (id === 'propostas') renderPropostas();
+  if (id === 'dashboard') renderDashboardGeral();
+  else if (id === 'propostas') renderPropostas();
   else if (id === 'parcelas') renderParcelas();
   else if (id === 'sinistros') renderSinistros();
   else if (id === 'assistencias') renderAssistencias();
@@ -1634,7 +2112,7 @@ function showApp(user) {
   appEl.classList.add('visible');
   const username = (user.email || '').split('@')[0];
   document.getElementById('sidebarNome').textContent = username;
-  showView('propostas');
+  showView('dashboard');
 }
 
 function showLogin() {

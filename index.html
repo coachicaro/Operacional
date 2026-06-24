@@ -117,6 +117,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .kanban-col-body{padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
 .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 13px;cursor:pointer;transition:all .15s;box-shadow:var(--shadow)}
 .kanban-card:hover{border-color:#B8BDCF;transform:translateY(-1px)}
+.kanban-card.dragging{opacity:.4}
+.kanban-col-body.drag-over{background:var(--accent-light);outline:2px dashed var(--accent);outline-offset:-2px}
 .kanban-card.urgent{border-color:var(--danger);background:var(--danger-light)}
 .kanban-card .title{font-weight:600;font-size:13.5px;margin-bottom:4px}
 .kanban-card .sub{font-size:11.5px;color:var(--text-2);margin-bottom:6px}
@@ -318,21 +320,30 @@ tbody td{padding:11px 14px;vertical-align:middle}
 <div class="toast" id="toast"></div>
 
 <script>
-(function loadSupabaseLib() {
-  const sources = [
+(function loadExternalLibs() {
+  function loadWithFallback(sources, onAllFail) {
+    let i = 0;
+    function tryNext() {
+      if (i >= sources.length) { onAllFail(); return; }
+      const s = document.createElement('script');
+      s.src = sources[i];
+      s.onerror = function () { i++; tryNext(); };
+      document.head.appendChild(s);
+    }
+    tryNext();
+  }
+
+  loadWithFallback([
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
     'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js',
     'https://cdnjs.cloudflare.com/ajax/libs/supabase/2.45.4/supabase.min.js',
-  ];
-  let i = 0;
-  function tryNext() {
-    if (i >= sources.length) { window.SUPABASE_LIB_FAILED = true; return; }
-    const s = document.createElement('script');
-    s.src = sources[i];
-    s.onerror = function () { i++; tryNext(); };
-    document.head.appendChild(s);
-  }
-  tryNext();
+  ], () => { window.SUPABASE_LIB_FAILED = true; });
+
+  loadWithFallback([
+    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  ], () => { window.XLSX_LIB_FAILED = true; });
 })();
 </script>
 
@@ -537,6 +548,7 @@ function setPropostasSubview(sub) {
 }
 
 async function loadPropostasKanban() {
+  await carregarMotivos();
   const data = await sbCall(
     sb.from('corretora_propostas').select('*').order('created_at', { ascending: false }),
     'Não foi possível carregar as propostas.'
@@ -557,7 +569,7 @@ function renderPropostasKanban(propostas) {
   content.innerHTML = `<div class="kanban">${PROPOSTA_STATUS.map(s => {
     const items = byStatus[s.key];
     return `
-      <div class="kanban-col">
+      <div class="kanban-col" data-col-key="${s.key}">
         <div class="kanban-col-header">
           <span>${s.label}</span>
           <span class="kanban-col-count">${items.length}</span>
@@ -574,22 +586,46 @@ function renderPropostasKanban(propostas) {
       openPropostaModal(p);
     });
   });
+
+  enableKanbanDragDrop(content, async (cardId, novoStatus) => {
+    const p = propostas.find(x => x.id === cardId);
+    if (!p || p.status === novoStatus) return;
+
+    // Status que exigem campo obrigatório (motivo): abre o modal já com o status escolhido,
+    // em vez de salvar direto, pra garantir que o motivo seja preenchido
+    if (novoStatus === 'cancelada' || novoStatus === 'pendente_seguradora') {
+      openPropostaModal({ ...p, status: novoStatus });
+      return;
+    }
+
+    await sbCall(sb.from('corretora_propostas').update({ status: novoStatus, updated_at: new Date().toISOString() }).eq('id', cardId), 'Erro ao mover proposta.');
+    showToast('Proposta movida para "' + (PROPOSTA_STATUS.find(s => s.key === novoStatus)?.label || novoStatus) + '".', 'success');
+    loadPropostasKanban();
+  });
 }
 
 function renderPropostaCard(p) {
   let stuckHtml = '';
   let urgentClass = '';
-  if (p.status === 'pendente_seguradora' && p.data_pendencia) {
-    const days = daysSince(p.data_pendencia);
-    let cls = 'days-ok';
-    if (days >= 10) { cls = 'days-danger'; urgentClass = 'urgent'; }
-    else if (days >= 5) cls = 'days-warn';
-    stuckHtml = `<span class="days-stuck ${cls}">${days}d parado</span>`;
+  let motivoHtml = '';
+  if (p.status === 'pendente_seguradora') {
+    if (p.data_pendencia) {
+      const days = daysSince(p.data_pendencia);
+      let cls = 'days-ok';
+      if (days >= 10) { cls = 'days-danger'; urgentClass = 'urgent'; }
+      else if (days >= 5) cls = 'days-warn';
+      stuckHtml = `<span class="days-stuck ${cls}">${days}d parado</span>`;
+    }
+    if (p.motivo_pendencia_id) {
+      const m = motivosPendencia.find(x => x.id === p.motivo_pendencia_id);
+      if (m) motivoHtml = `<span class="chip chip-danger">${escapeHtml(m.label)}</span>`;
+    }
   }
   return `
-    <div class="kanban-card ${urgentClass}" data-id="${p.id}">
+    <div class="kanban-card ${urgentClass}" data-id="${p.id}" draggable="true">
       <div class="title">${escapeHtml(p.cliente_nome)}</div>
       <div class="sub">${escapeHtml(p.seguradora || 'Seguradora não informada')} ${p.numero_proposta ? '· ' + escapeHtml(p.numero_proposta) : ''}</div>
+      ${motivoHtml ? `<div style="margin-bottom:4px;">${motivoHtml}</div>` : ''}
       <div class="row">
         ${p.responsavel ? `<span class="chip">${escapeHtml(p.responsavel)}</span>` : '<span></span>'}
         ${stuckHtml}
@@ -745,37 +781,63 @@ function abrirPropostaReposicao(parcelaId) {
 
 function openImportPropostasModal() {
   const body = `
-    <p class="text-muted" style="margin-top:0;">Cole abaixo a lista de propostas pendentes (uma por linha). Formato sugerido, separado por <strong>ponto e vírgula</strong>:</p>
-    <p class="text-muted" style="font-size:12px;">cliente; seguradora; nº proposta; status (opcional)</p>
-    <div class="field">
-      <textarea id="import-text" rows="10" placeholder="João Silva; Porto Seguro; 12345; pendente_seguradora
-Maria Souza; Allianz; 98765"></textarea>
-    </div>
+    <p class="text-muted" style="margin-top:0;">Envie a planilha exportada do SEGFY (.xlsx, .xls ou .csv). O sistema procura automaticamente colunas como <strong>cliente</strong>, <strong>seguradora</strong> e <strong>número da proposta</strong> — não importa a ordem.</p>
+    <div class="field"><input type="file" id="import-file" accept=".xlsx,.xls,.csv"></div>
+    <div id="import-preview"></div>
   `;
   const footer = `
     <button class="btn" id="btn-cancel-import">Cancelar</button>
-    <button class="btn btn-primary" id="btn-do-import">Importar</button>
+    <button class="btn btn-primary" id="btn-do-import" disabled>Importar</button>
   `;
   openModal('Importar propostas do SEGFY', body, footer);
   document.getElementById('btn-cancel-import').onclick = closeModal;
-  document.getElementById('btn-do-import').onclick = async () => {
-    const raw = document.getElementById('import-text').value.trim();
-    if (!raw) { closeModal(); return; }
-    const validStatusKeys = PROPOSTA_STATUS.map(s => s.key);
-    const rows = raw.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
-      const parts = line.split(';').map(p => p.trim());
-      const status = parts[3] && validStatusKeys.includes(parts[3]) ? parts[3] : 'pendente_seguradora';
-      return {
-        cliente_nome: parts[0] || 'Sem nome',
-        seguradora: parts[1] || null,
-        numero_proposta: parts[2] || null,
-        status,
-        data_pendencia: status === 'pendente_seguradora' ? new Date().toISOString().slice(0,10) : null,
+
+  let linhasParaImportar = [];
+
+  document.getElementById('import-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    const previewEl = document.getElementById('import-preview');
+    const btnImport = document.getElementById('btn-do-import');
+    if (!file) return;
+    previewEl.innerHTML = `<p class="text-muted" style="font-size:12.5px;">Lendo arquivo...</p>`;
+    try {
+      const rows = await lerArquivoPlanilha(file);
+      linhasParaImportar = rows.map(row => ({
+        cliente_nome: pegarCampo(row, 'cliente', 'cliente_nome', 'nome', 'nome_cliente', 'segurado') || 'Sem nome',
+        seguradora: pegarCampo(row, 'seguradora', 'cia', 'companhia'),
+        numero_proposta: pegarCampo(row, 'numero_proposta', 'n_proposta', 'proposta', 'numero', 'nº_proposta'),
+        ramo: pegarCampo(row, 'ramo', 'tipo', 'produto'),
+        status: 'importado_segfy',
         data_criacao_funil: new Date().toISOString().slice(0,10),
-      };
-    });
-    await sbCall(sb.from('corretora_propostas').insert(rows), 'Erro ao importar.');
-    showToast(`${rows.length} proposta(s) importada(s).`, 'success');
+      })).filter(r => r.cliente_nome !== 'Sem nome' || r.numero_proposta);
+
+      if (linhasParaImportar.length === 0) {
+        previewEl.innerHTML = `<p style="color:var(--danger);font-size:12.5px;">Não encontramos linhas com dados reconhecíveis nessa planilha. Verifique se há uma coluna de cliente ou número de proposta.</p>`;
+        btnImport.disabled = true;
+        return;
+      }
+
+      previewEl.innerHTML = `
+        <p style="font-size:12.5px;margin-bottom:8px;"><strong>${linhasParaImportar.length}</strong> propostas encontradas — todas entrarão direto em <strong>"Importado no SEGFY"</strong>:</p>
+        <div class="table-wrap" style="max-height:240px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Cliente</th><th>Seguradora</th><th>Nº proposta</th></tr></thead>
+            <tbody>${linhasParaImportar.slice(0, 50).map(r => `<tr><td>${escapeHtml(r.cliente_nome)}</td><td>${escapeHtml(r.seguradora || '—')}</td><td>${escapeHtml(r.numero_proposta || '—')}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+        ${linhasParaImportar.length > 50 ? `<p class="text-muted" style="font-size:11.5px;margin-top:6px;">Mostrando as primeiras 50 de ${linhasParaImportar.length}.</p>` : ''}
+      `;
+      btnImport.disabled = false;
+    } catch (err) {
+      previewEl.innerHTML = `<p style="color:var(--danger);font-size:12.5px;">Erro ao ler arquivo: ${escapeHtml(err.message)}</p>`;
+      btnImport.disabled = true;
+    }
+  };
+
+  document.getElementById('btn-do-import').onclick = async () => {
+    if (linhasParaImportar.length === 0) { closeModal(); return; }
+    await sbCall(sb.from('corretora_propostas').insert(linhasParaImportar), 'Erro ao importar.');
+    showToast(`${linhasParaImportar.length} proposta(s) importada(s) em "Importado no SEGFY".`, 'success');
     closeModal();
     renderPropostas();
   };
@@ -912,7 +974,7 @@ function renderParcelasKanban(parcelas) {
   content.innerHTML = `<div class="kanban">${PARCELA_STATUS.map(s => {
     const items = byStatus[s.key];
     return `
-      <div class="kanban-col">
+      <div class="kanban-col" data-col-key="${s.key}">
         <div class="kanban-col-header">
           <span>${s.label}</span>
           <span class="kanban-col-count">${items.length}</span>
@@ -929,6 +991,14 @@ function renderParcelasKanban(parcelas) {
       openParcelaModal(p);
     });
   });
+
+  enableKanbanDragDrop(content, async (cardId, novoStatus) => {
+    const p = parcelas.find(x => x.id === cardId);
+    if (!p || p.status === novoStatus) return;
+    await sbCall(sb.from('corretora_parcelas').update({ status: novoStatus, updated_at: new Date().toISOString() }).eq('id', cardId), 'Erro ao mover parcela.');
+    showToast('Parcela movida para "' + (PARCELA_STATUS.find(s => s.key === novoStatus)?.label || novoStatus) + '".', 'success');
+    loadParcelasKanban();
+  });
 }
 
 function renderParcelaCard(p) {
@@ -940,7 +1010,7 @@ function renderParcelaCard(p) {
   }
   const fp = FORMA_PAGAMENTO.find(f => f.key === p.forma_pagamento);
   return `
-    <div class="kanban-card ${urgentClass}" data-id="${p.id}">
+    <div class="kanban-card ${urgentClass}" data-id="${p.id}" draggable="true">
       <div class="title">${escapeHtml(p.cliente_nome)}</div>
       <div class="sub">${escapeHtml(p.seguradora || '—')} ${p.numero_parcela ? '· parc. ' + escapeHtml(p.numero_parcela) : ''}</div>
       <div class="row">
@@ -1032,38 +1102,70 @@ function openParcelaModal(p) {
 
 function openImportParcelasModal() {
   const body = `
-    <p class="text-muted" style="margin-top:0;">Cole a lista de parcelas em atraso (uma por linha), separada por <strong>ponto e vírgula</strong>:</p>
-    <p class="text-muted" style="font-size:12px;">cliente; seguradora; nº parcela; valor; vencimento (AAAA-MM-DD); forma de pagamento (boleto/cartao/debito_automatico/pix/outro)</p>
-    <div class="field">
-      <textarea id="import-text" rows="10" placeholder="João Silva; Porto Seguro; 3; 250.00; 2026-06-10; boleto
-Maria Souza; Allianz; 5; 180.50; 2026-06-05; pix"></textarea>
-    </div>
+    <p class="text-muted" style="margin-top:0;">Envie a planilha de parcelas em atraso (.xlsx, .xls ou .csv). O sistema procura colunas como <strong>cliente</strong>, <strong>seguradora</strong>, <strong>valor</strong> e <strong>vencimento</strong> automaticamente.</p>
+    <div class="field"><input type="file" id="import-file" accept=".xlsx,.xls,.csv"></div>
+    <div id="import-preview"></div>
   `;
   const footer = `
     <button class="btn" id="btn-cancel-import">Cancelar</button>
-    <button class="btn btn-primary" id="btn-do-import">Importar</button>
+    <button class="btn btn-primary" id="btn-do-import" disabled>Importar</button>
   `;
   openModal('Importar parcelas', body, footer);
   document.getElementById('btn-cancel-import').onclick = closeModal;
+
+  let linhasParaImportar = [];
+
+  document.getElementById('import-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    const previewEl = document.getElementById('import-preview');
+    const btnImport = document.getElementById('btn-do-import');
+    if (!file) return;
+    previewEl.innerHTML = `<p class="text-muted" style="font-size:12.5px;">Lendo arquivo...</p>`;
+    try {
+      const rows = await lerArquivoPlanilha(file);
+      const formasValidas = FORMA_PAGAMENTO.map(f => f.key);
+      linhasParaImportar = rows.map(row => {
+        const valorRaw = pegarCampo(row, 'valor', 'valor_parcela');
+        const formaRaw = pegarCampo(row, 'forma_pagamento', 'forma_de_pagamento', 'pagamento');
+        const formaNormalizada = formaRaw ? normalizarChave(formaRaw) : null;
+        return {
+          cliente_nome: pegarCampo(row, 'cliente', 'cliente_nome', 'nome', 'segurado') || 'Sem nome',
+          seguradora: pegarCampo(row, 'seguradora', 'cia', 'companhia'),
+          numero_parcela: pegarCampo(row, 'numero_parcela', 'n_parcela', 'parcela'),
+          valor: valorRaw ? parseFloat(valorRaw.replace(/\./g, '').replace(',', '.')) || parseFloat(valorRaw) : null,
+          data_vencimento: pegarCampo(row, 'data_vencimento', 'vencimento', 'data'),
+          forma_pagamento: formasValidas.includes(formaNormalizada) ? formaNormalizada : null,
+          status: 'atraso_identificado',
+        };
+      }).filter(r => r.cliente_nome !== 'Sem nome' || r.numero_parcela);
+
+      if (linhasParaImportar.length === 0) {
+        previewEl.innerHTML = `<p style="color:var(--danger);font-size:12.5px;">Não encontramos linhas com dados reconhecíveis nessa planilha.</p>`;
+        btnImport.disabled = true;
+        return;
+      }
+
+      previewEl.innerHTML = `
+        <p style="font-size:12.5px;margin-bottom:8px;"><strong>${linhasParaImportar.length}</strong> parcelas encontradas:</p>
+        <div class="table-wrap" style="max-height:240px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Cliente</th><th>Seguradora</th><th>Valor</th><th>Vencimento</th></tr></thead>
+            <tbody>${linhasParaImportar.slice(0, 50).map(r => `<tr><td>${escapeHtml(r.cliente_nome)}</td><td>${escapeHtml(r.seguradora || '—')}</td><td>${fmtMoney(r.valor)}</td><td>${escapeHtml(r.data_vencimento || '—')}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+        ${linhasParaImportar.length > 50 ? `<p class="text-muted" style="font-size:11.5px;margin-top:6px;">Mostrando as primeiras 50 de ${linhasParaImportar.length}.</p>` : ''}
+      `;
+      btnImport.disabled = false;
+    } catch (err) {
+      previewEl.innerHTML = `<p style="color:var(--danger);font-size:12.5px;">Erro ao ler arquivo: ${escapeHtml(err.message)}</p>`;
+      btnImport.disabled = true;
+    }
+  };
+
   document.getElementById('btn-do-import').onclick = async () => {
-    const raw = document.getElementById('import-text').value.trim();
-    if (!raw) { closeModal(); return; }
-    const formasValidas = FORMA_PAGAMENTO.map(f => f.key);
-    const rows = raw.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
-      const parts = line.split(';').map(p => p.trim());
-      const forma = parts[5] && formasValidas.includes(parts[5]) ? parts[5] : null;
-      return {
-        cliente_nome: parts[0] || 'Sem nome',
-        seguradora: parts[1] || null,
-        numero_parcela: parts[2] || null,
-        valor: parts[3] ? parseFloat(parts[3].replace(',', '.')) : null,
-        data_vencimento: parts[4] || null,
-        forma_pagamento: forma,
-        status: 'atraso_identificado',
-      };
-    });
-    await sbCall(sb.from('corretora_parcelas').insert(rows), 'Erro ao importar.');
-    showToast(`${rows.length} parcela(s) importada(s).`, 'success');
+    if (linhasParaImportar.length === 0) { closeModal(); return; }
+    await sbCall(sb.from('corretora_parcelas').insert(linhasParaImportar), 'Erro ao importar.');
+    showToast(`${linhasParaImportar.length} parcela(s) importada(s).`, 'success');
     closeModal();
     renderParcelas();
   };
@@ -1213,7 +1315,7 @@ async function loadSinistrosKanban() {
   sub.innerHTML = `<div class="kanban">${cols.map(c => {
     const items = byEtapa[c.key] || [];
     return `
-      <div class="kanban-col">
+      <div class="kanban-col" data-col-key="${c.key}">
         <div class="kanban-col-header"><span>${c.label}</span><span class="kanban-col-count">${items.length}</span></div>
         <div class="kanban-col-body">
           ${items.map(s => renderSinistroCard(s)).join('') || '<div class="text-muted" style="font-size:12px;padding:8px;">Vazio</div>'}
@@ -1227,6 +1329,49 @@ async function loadSinistrosKanban() {
       openSinistroModal(s);
     });
   });
+
+  enableKanbanDragDrop(sub, async (cardId, novaColKey) => {
+    const s = data.find(x => x.id === cardId);
+    if (!s) return;
+    const colunaAtual = s.status_geral === 'concluido' ? 'concluido' : s.etapa_atual;
+    if (colunaAtual === novaColKey) return;
+    await moverSinistroParaColuna(s, novaColKey, etapas);
+  });
+}
+
+// Move um sinistro arrastado para a coluna (etapa, ou "concluido") de destino,
+// ajustando o histórico de etapas (marca como concluídas as anteriores, desmarca as posteriores).
+async function moverSinistroParaColuna(s, novaColKey, etapas) {
+  if (novaColKey === 'concluido') {
+    // Arrastar para "Concluído" direto não tem campo de valor final — pede pra abrir o modal
+    showToast('Para concluir, abra o sinistro e use "Encerrar" (é necessário informar o valor final).', 'error');
+    return;
+  }
+
+  const idxDestino = etapas.findIndex(e => e.chave === novaColKey);
+  if (idxDestino === -1) return;
+
+  const historico = await sbCall(sb.from('corretora_sinistro_etapas_historico').select('*').eq('sinistro_id', s.id), 'Erro ao carregar histórico.') || [];
+
+  for (let i = 0; i < etapas.length; i++) {
+    const etapaChave = etapas[i].chave;
+    const hist = historico.find(h => h.etapa_chave === etapaChave);
+    if (!hist) continue;
+    const deveEstarConcluida = i < idxDestino;
+    const estaConcluida = !!hist.data_concluida;
+    if (deveEstarConcluida && !estaConcluida) {
+      await sb.from('corretora_sinistro_etapas_historico').update({ data_concluida: new Date().toISOString() }).eq('id', hist.id);
+    } else if (!deveEstarConcluida && estaConcluida) {
+      await sb.from('corretora_sinistro_etapas_historico').update({ data_concluida: null }).eq('id', hist.id);
+    }
+  }
+
+  const payload = { etapa_atual: novaColKey, updated_at: new Date().toISOString() };
+  if (s.status_geral === 'concluido') payload.status_geral = 'em_andamento';
+  await sbCall(sb.from('corretora_sinistros').update(payload).eq('id', s.id), 'Erro ao mover sinistro.');
+
+  showToast('Sinistro movido para "' + (etapas[idxDestino].label) + '".', 'success');
+  loadSinistrosKanban();
 }
 
 function renderSinistroCard(s) {
@@ -1241,7 +1386,7 @@ function renderSinistroCard(s) {
     }
   }
   return `
-    <div class="kanban-card ${urgentClass}" data-id="${s.id}">
+    <div class="kanban-card ${urgentClass}" data-id="${s.id}" draggable="true">
       <div class="title">${escapeHtml(s.cliente_nome)}</div>
       <div class="sub">${escapeHtml(s.tipo_nome)} · ${escapeHtml(s.codigo)}</div>
       <div class="row">
@@ -1326,7 +1471,7 @@ async function openSinistroModal(s) {
   const etapas = (tipo && tipo.etapas && tipo.etapas.length) ? tipo.etapas : SINISTRO_ETAPAS_PADRAO;
   const publicUrl = `${window.location.origin}${window.location.pathname}?sinistro=${s.link_token}`;
 
-  const etapasHtml = etapas.map(e => {
+  const etapasHtml = etapas.map((e, idx) => {
     const hist = (historico || []).find(h => h.etapa_chave === e.chave);
     const done = hist && hist.data_concluida;
     const isCurrent = s.etapa_atual === e.chave && !done;
@@ -1336,7 +1481,12 @@ async function openSinistroModal(s) {
           <div style="font-weight:${isCurrent ? 600 : 500}; font-size:13px;">${escapeHtml(e.label)} ${isCurrent ? '<span class="chip" style="margin-left:6px;">atual</span>' : ''}</div>
           <div class="text-muted" style="font-size:11.5px;">Prevista: ${fmtDate(hist?.data_prevista)} ${done ? '· concluída em ' + fmtDate(hist.data_concluida.slice(0,10)) : ''}</div>
         </div>
-        ${!done ? `<button class="btn btn-sm btn-green" data-etapa="${e.chave}">Concluir etapa</button>` : '<span class="chip chip-green">✓ feito</span>'}
+        ${!done ? `<button class="btn btn-sm btn-green" data-etapa="${e.chave}">Concluir etapa</button>` : `
+          <div class="row-flex">
+            <span class="chip chip-green">✓ feito</span>
+            ${idx > 0 ? `<button class="btn btn-sm btn-ghost" data-voltar-etapa="${e.chave}" title="Desfazer esta etapa e voltar para a anterior">↩ Voltar</button>` : ''}
+          </div>
+        `}
       </div>`;
   }).join('');
 
@@ -1453,6 +1603,33 @@ async function openSinistroModal(s) {
         await sbCall(sb.from('corretora_sinistros').update({ etapa_atual: proxima.chave, updated_at: new Date().toISOString() }).eq('id', s.id), 'Erro ao avançar etapa.');
       }
       showToast('Etapa concluída.');
+      closeModal();
+      const refreshed = await sbCall(sb.from('corretora_sinistros').select('*').eq('id', s.id).single(), 'Erro.');
+      if (refreshed) openSinistroModal(refreshed);
+      else renderSinistros();
+    };
+  });
+
+  // Voltar etapa: desfaz a conclusão da etapa escolhida e volta o sinistro para ela
+  document.querySelectorAll('[data-voltar-etapa]').forEach(btn => {
+    btn.onclick = async () => {
+      const etapaChave = btn.dataset.voltarEtapa;
+      if (!confirm('Voltar para a etapa "' + (etapas.find(e => e.chave === etapaChave)?.label || etapaChave) + '"? Isso desfaz a conclusão registrada.')) return;
+
+      await sbCall(
+        sb.from('corretora_sinistro_etapas_historico')
+          .update({ data_concluida: null })
+          .eq('sinistro_id', s.id).eq('etapa_chave', etapaChave),
+        'Erro ao voltar etapa.'
+      );
+      // Se o sinistro já estava concluído, reabre
+      const payload = { etapa_atual: etapaChave, updated_at: new Date().toISOString() };
+      if (s.status_geral === 'concluido') {
+        payload.status_geral = 'em_andamento';
+      }
+      await sbCall(sb.from('corretora_sinistros').update(payload).eq('id', s.id), 'Erro ao voltar etapa.');
+
+      showToast('Etapa revertida.', 'success');
       closeModal();
       const refreshed = await sbCall(sb.from('corretora_sinistros').select('*').eq('id', s.id).single(), 'Erro.');
       if (refreshed) openSinistroModal(refreshed);
@@ -1646,7 +1823,7 @@ async function loadAssistenciasKanban() {
   sub.innerHTML = `<div class="kanban">${ASSISTENCIA_STATUS.map(s => {
     const items = byStatus[s.key];
     return `
-      <div class="kanban-col">
+      <div class="kanban-col" data-col-key="${s.key}">
         <div class="kanban-col-header"><span>${s.label}</span><span class="kanban-col-count">${items.length}</span></div>
         <div class="kanban-col-body">
           ${items.map(a => renderAssistenciaCard(a)).join('') || '<div class="text-muted" style="font-size:12px;padding:8px;">Vazio</div>'}
@@ -1660,6 +1837,14 @@ async function loadAssistenciasKanban() {
       openAssistenciaModal(a);
     });
   });
+
+  enableKanbanDragDrop(sub, async (cardId, novoStatus) => {
+    const a = data.find(x => x.id === cardId);
+    if (!a || a.status === novoStatus) return;
+    await sbCall(sb.from('corretora_assistencias').update({ status: novoStatus, updated_at: new Date().toISOString() }).eq('id', cardId), 'Erro ao mover assistência.');
+    showToast('Assistência movida para "' + (ASSISTENCIA_STATUS.find(s => s.key === novoStatus)?.label || novoStatus) + '".', 'success');
+    loadAssistenciasKanban();
+  });
 }
 
 function renderAssistenciaCard(a) {
@@ -1671,7 +1856,7 @@ function renderAssistenciaCard(a) {
     else prazoInfo = `<span class="days-stuck days-ok">vence em ${days}d</span>`;
   }
   return `
-    <div class="kanban-card ${urgentClass}" data-id="${a.id}">
+    <div class="kanban-card ${urgentClass}" data-id="${a.id}" draggable="true">
       <div class="title">${escapeHtml(a.cliente_nome)}</div>
       <div class="sub">${escapeHtml(a.tipo_nome)}</div>
       <div class="row">
@@ -1999,6 +2184,89 @@ async function sbCall(promise, errMsg) {
     return null;
   }
   return data;
+}
+
+// ---------- Leitura de arquivo Excel/CSV (reutilizável) ----------
+// Retorna array de objetos, com chaves normalizadas (minúsculas, sem acento, sem espaço)
+function normalizarChave(str) {
+  return String(str).trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function lerArquivoPlanilha(file) {
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX === 'undefined') {
+      reject(new Error('Biblioteca de planilhas não carregou. Verifique sua internet e recarregue a página.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: null, raw: false });
+        const normalizado = rows.map(row => {
+          const obj = {};
+          Object.keys(row).forEach(k => { obj[normalizarChave(k)] = row[k]; });
+          return obj;
+        });
+        resolve(normalizado);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Busca o primeiro valor não vazio entre várias possíveis variações de nome de coluna
+function pegarCampo(row, ...nomes) {
+  for (const nome of nomes) {
+    const key = normalizarChave(nome);
+    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+      return String(row[key]).trim();
+    }
+  }
+  return null;
+}
+// containerEl: elemento que contém os .kanban-col
+// onDrop(cardId, novaColunaKey): callback assíncrono que persiste a mudança
+function enableKanbanDragDrop(containerEl, onDrop) {
+  let draggedId = null;
+
+  containerEl.querySelectorAll('.kanban-card[draggable="true"]').forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      draggedId = card.dataset.id;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedId = null;
+    });
+  });
+
+  containerEl.querySelectorAll('.kanban-col-body').forEach(colBody => {
+    const col = colBody.closest('.kanban-col');
+    const colKey = col ? col.dataset.colKey : null;
+
+    colBody.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      colBody.classList.add('drag-over');
+    });
+    colBody.addEventListener('dragleave', () => {
+      colBody.classList.remove('drag-over');
+    });
+    colBody.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      colBody.classList.remove('drag-over');
+      if (!draggedId || !colKey) return;
+      await onDrop(draggedId, colKey);
+    });
+  });
 }
 
 // ---------- Modal ----------
